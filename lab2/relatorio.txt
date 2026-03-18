@@ -239,8 +239,9 @@ Prompt:------------------------------------------
 (Cliente // pid 14578): 45600
 
 Entendimento:------------------------------------------
+(obs.: Primeiramente dei uma mini simplificado no exercicio usando ints mas n acho que isso tenha afetado muita coisa.)
 
-Consegui entender melhor como funcionava o processo de transformar um filho em outro processo(antes de fazer isso tinha tentado fazer como coisas separadas até eu lembrar do exec). Ficou bem mais facil depois que eu fiz isso. Além disso entendi uma pouco mais sobre como fazer o attach caso aquele espaço da memoria já exita(ou seja não usar o IPC_CREAT). Dei uma mini simplificado no exercicio usando ints mas n acho que isso tenha afetado muita coisa.
+Consegui entender melhor como funcionava o processo de transformar um filho em outro processo(antes de fazer isso tinha tentado fazer como coisas separadas até eu lembrar do exec). Ficou bem mais facil depois que eu fiz isso. Além disso entendi uma pouco mais sobre como fazer o attach caso aquele espaço da memoria já exita(ou seja não usar o IPC_CREAT no cliente). 
 
 Preciso depois perguntar se eu precisa colocar o exit() no programa pai, ou se o return 0 já mata o filho de uma vez. Também desaloquei a memoria por segurança.
 
@@ -330,3 +331,124 @@ Entendimento:------------------------------------------
 Tive um pouco de problema com a interpretação da questão, já que de primeira eu n tinha entendido oque era pra fazer. Depois de um tempo entendi.
 
 Dei uma boa simplificada na questão(sem mudar muita coisa). Consegui enteder bem como funcionaca a parte dividir algumas tarefas maiores em pequenas tarefas e resolve-las em paralelo. Não achei muito dificil mas, tive de colocar bastante informação visual para consegui mostrar oque tava acontendo, coloquei tanto que area cada uma epxlorou como que resultado obteve. 
+
+
+4)
+Codigo:------------------------------------------
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++
+//ex4.c
+
+
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
+
+int main() {
+    // 1. Cria as memórias com os números diretos
+    int id1 = shmget(7000, sizeof(int) * 2, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+    int id2 = shmget(8000, sizeof(int) * 2, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+    int *m1 = (int *) shmat(id1, 0, 0);
+    int *m2 = (int *) shmat(id2, 0, 0);
+
+    m1[1] = 0; m2[1] = 0;
+
+    // 2. Chama os dois programas diferentes
+    if (fork() == 0) {
+        execl("./p1", "p1", NULL); // Roda o executável p1
+        exit(0);
+    }
+    if (fork() == 0) {
+        execl("./p2", "p2", NULL); // Roda o executável p2
+        exit(0);
+    }
+
+    printf("(Pai // pid %d) Esperando P1 e P2...\n", getpid());
+    while(m1[1] == 0 || m2[1] == 0) {
+        usleep(100000); // usei pq é mais preciso que o sleep normal(tem como colocar menor que 1s)
+    }
+
+    printf("\n(Pai // pid %d) Resultado: %d * %d = %d\n",getpid(), m1[0], m2[0], m1[0] * m2[0]);
+
+    // Limpeza
+    shmdt(m1); shmdt(m2);
+    shmctl(id1, IPC_RMID, NULL);
+    shmctl(id2, IPC_RMID, NULL);
+
+    return 0;
+}
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//p1.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/shm.h>
+#include <unistd.h>
+#include <time.h>
+
+int main() {
+    // Usando o número 7000 direto no comando
+    int id = shmget(7000, sizeof(int) * 2, 0);
+    int *m1 = (int *) shmat(id, 0, 0);
+
+    srand(getpid()); // fiz isso para não dar sempre o mesmo nos dois(só fiz no p1)
+    sleep(rand() % 5 + 1); //Limitei pq tava demorando demais as vezes
+
+    m1[0] = rand() % 10 + 1; 
+    m1[1] = 1;              
+
+    printf("(P1 pid %d) Valor %d enviado na chave 7000.\n",getpid(), m1[0]);
+    shmdt(m1);
+    return 0;
+}
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//p2.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/shm.h>
+#include <unistd.h>
+#include <time.h>
+
+int main() {
+    // Usando o número 8000 fixo 
+    int id = shmget(8000, sizeof(int) * 2, 0);
+    int *m2 = (int *) shmat(id, 0, 0);
+
+    sleep(rand() % 5 + 1); //Limitei pq tava demorando demais as vezes
+
+    m2[0] = rand() % 10 + 1;
+    m2[1] = 1;              
+
+    printf("(P2 // pid %d) Valor %d enviado na chave 8000.\n",getpid(), m2[0]);
+    shmdt(m2);
+    return 0;
+}
+
+Comandos:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o e4 ex4.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o p2 p2.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o p1 p1.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ ./e4
+
+Prompt:------------------------------------------
+(Pai // pid 58636) Esperando P1 e P2...
+(P1 pid 58637) Valor 5 enviado na chave 7000.
+(P2 // pid 58638) Valor 7 enviado na chave 8000.
+
+(Pai // pid 58636) Resultado: 5 * 7 = 35
+
+Entendimento:------------------------------------------
+Tive que fazer umas mudanças nesse pq eu não sabia fazer algumas partes que não foram especificadas. Tive que usar keys fixas(7000 e 8000) para poder fazer attach em p1 e p2. Além disso tive alguns problemas com o rand, tive que ver uma forma dele não ser o mesmo, assim acabei usando srand atrelado ao getpid() no p1. Fora isso também tive um pouco de problema com o sleep já que ele estava dando intervalos muito grandes, então capei ele a 5 seg. 
+
+A principal coisa que eu não entendi sobre esse exercicio foi a necessidade de usar uma sequencia, quando o programa principal poderia olhar e verificar se algo foi modificado na propria memoria compartilhada.
+
+Essa pergunta serviu bem para entender um pouco de tudo que vi nos outros exercicios e a também levantar alguma duvidas interessantes(que vou precisar ver em aual)
+

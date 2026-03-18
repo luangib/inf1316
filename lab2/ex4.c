@@ -1,5 +1,6 @@
 //ex4.c
 
+
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -9,51 +10,37 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
+int main() {
+    // 1. Cria as memórias com os números diretos
+    int id1 = shmget(7000, sizeof(int) * 2, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+    int id2 = shmget(8000, sizeof(int) * 2, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 
-int main (int argc, char *argv[])
-{
-//Prefiri puxar um numero em vez de uma mesagem do dia para deixar mais simples, não acho que vá alterar muita coisa(além do espaço alocado na memória compartilhada)
+    int *m1 = (int *) shmat(id1, 0, 0);
+    int *m2 = (int *) shmat(id2, 0, 0);
 
-//minhas variaveis 
-int segmento1, segmento2, *p1, *p2, id, pid, status;
-int n;
+    m1[1] = 0; m2[1] = 0;
 
-//processo da criação m1 
-segmento1 = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+    // 2. Chama os dois programas diferentes
+    if (fork() == 0) {
+        execl("./p1", "p1", NULL); // Roda o executável p1
+        exit(0);
+    }
+    if (fork() == 0) {
+        execl("./p2", "p2", NULL); // Roda o executável p2
+        exit(0);
+    }
 
-p1 = (int *) shmat (segmento1, 0, 0); // comparar o retorno com -1
+    printf("(Pai // pid %d) Esperando P1 e P2...\n", getpid());
+    while(m1[1] == 0 || m2[1] == 0) {
+        usleep(100000); // usei pq é mais preciso que o sleep normal(tem como colocar menor que 1s)
+    }
 
-//processo de criação m2
-segmento2 = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+    printf("\n(Pai // pid %d) Resultado: %d * %d = %d\n",getpid(), m1[0], m2[0], m1[0] * m2[0]);
 
-p2 = (int *) shmat (segmento2, 0, 0); // comparar o retorno com -1
+    // Limpeza
+    shmdt(m1); shmdt(m2);
+    shmctl(id1, IPC_RMID, NULL);
+    shmctl(id2, IPC_RMID, NULL);
 
-
-//pegando algo pelo stin
-printf("(Pai // Pid: %d) Inicio",getpid());
-
-
-pid = fork();
-
-if(pid==0){
-execl("./p1", "p1",NULL);
-exit(0);
-
+    return 0;
 }
-else{
-waitpid(-1, NULL, 0);
-
-//Tirando a memoria alocada
-shmdt(p1);
-shmctl(segmento1,IPC_RMID,NULL);
-
-shmdt(p2);
-shmctl(segmento2,IPC_RMID,NULL);
-}
-
-return 0;
-}
-
-
-
-
