@@ -1,9 +1,14 @@
+#include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/wait.h>
-int main (int argc, char *argv[])
+#include <sys/types.h>
+#include <stdlib.h>
+
+
+int main ()
 {
 // comen tarios importantes: Vou usar matrizes 2x2 e vou seguir com a segunte logica os dois primeiros calores forma a primeira linha e os dois outros a segunda linha 
 // ou seja v[4]= {1,2,3,4} forma a seguinte matriz:
@@ -45,12 +50,12 @@ matriz3 = shmget (IPC_PRIVATE, sizeof (int)*4, IPC_CREAT | IPC_EXCL | S_IRUSR | 
 
 p3 = (int *) shmat (matriz3, 0, 0); // comparar o retorno com -1
 
-pid=fork();
+
 
 if ((id = fork()) < 0)
 {
 puts ("Erro na criação do novo processo");
-exit (-2);
+exit (3);
 }
 
 //Filho
@@ -65,7 +70,7 @@ for (size_t i = 0; i < linhas; i++)
         printf("%d ", p3[i]);
         }
         printf("\n");
-        exit(0);
+        exit(3);
     }  
     
 }

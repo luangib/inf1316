@@ -1,9 +1,13 @@
+//Cliente.c
+
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
 
 
 int main (int argc, char *argv[])
@@ -23,7 +27,7 @@ if (p == (void *) -1) {
         exit(1);
     }
 
-printf("%d",*p);
+printf("(Cliente // pid %d): %d\n",getpid(),*p);
 
 // não sabia se precisa fazer ou não mas fiz
 shmdt(p);

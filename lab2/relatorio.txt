@@ -1,0 +1,332 @@
+Atividade: Lab 4 - INF1316 (de 2026.1)
+Nome: Luan Fnracisco Gibson Coutinho
+MAtricula: 2411167
+        +--------------------------------------------------+
+        Padrão de reposta
+        n)
+        Codigo:------------------------------------------
+
+
+        Comandos:------------------------------------------
+
+
+        Prompt:------------------------------------------
+
+
+        Entendimento:------------------------------------------
+
+        +--------------------------------------------------+
+
+
+
+
+1)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
+
+
+int main ()
+{
+// comen tarios importantes: Vou usar matrizes 2x2 e vou seguir com a segunte logica os dois primeiros calores forma a primeira linha e os dois outros a segunda linha 
+// ou seja v[4]= {1,2,3,4} forma a seguinte matriz:
+//|1,2|
+//|3,4|
+
+
+int matriz1,matriz2,matriz3, *p1,*p2,*p3, id, pid, status, pid2;
+int linhas, colunas;
+
+linhas =2;
+colunas=2;
+
+
+//MATRIZ 1 (PREENCHIDA) --------------------------------------------------------------------
+
+matriz1 = shmget (IPC_PRIVATE, sizeof (int)*4, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+p1 = (int *) shmat (matriz1, 0, 0); // comparar o retorno com -1
+p1[0] =1;
+p1[1] =1;
+p1[2] =1;
+p1[3] =1;
+
+
+//MATRIZ 2 (PREENCHIDA)-------------------------------------------------------------------------
+matriz2 = shmget (IPC_PRIVATE, sizeof (int)*4, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+p2 = (int *) shmat (matriz2, 0, 0); // comparar o retorno com -1
+p2[0] =0;
+p2[1] =0;
+p2[2] =0;
+p2[3] =0;
+
+
+// MATRIZ 3 (VAZIA)-------------------------------------------------------------------
+matriz3 = shmget (IPC_PRIVATE, sizeof (int)*4, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+
+p3 = (int *) shmat (matriz3, 0, 0); // comparar o retorno com -1
+
+
+
+if ((id = fork()) < 0)
+{
+puts ("Erro na criação do novo processo");
+exit (3);
+}
+
+//Filho
+
+for (size_t i = 0; i < linhas; i++)
+{
+    pid=fork();
+    if (id == 0){
+        for (size_t i = 0; i < colunas; i++)
+        {
+        p3[i]= p1[i]+p2[i];
+        printf("%d ", p3[i]);
+        }
+        printf("\n");
+        exit(3);
+    }  
+    
+}
+waitpid(-1, NULL, 0);
+
+
+// libera a memória compartilhada do processo
+shmdt (p1);
+shmdt (p2);
+shmdt (p3);
+// libera a memória compartilhada
+shmctl (matriz1, IPC_RMID, 0);
+shmctl (matriz2, IPC_RMID, 0);
+shmctl (matriz3, IPC_RMID, 0);
+return 0;
+
+}
+
+//Dicas do Monitor
+//for l in linhas:
+//    f = fork()
+//    if filho:
+//        trabalha na linha l
+//        exit
+
+
+
+
+Comandos:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o e1 ex1.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ ./e1
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ ./e1
+1 1 
+1 1 
+
+Entendimento:------------------------------------------
+Consegui entender mais ou menos como criar de maneira mais simples criar uma maneira de criar filhos mediante ao tamanho relativo da matriz. Mas ainda asism surgiram algumas duvidas de algumas coisas, que estava usando somente pois estavama nos slides, ainda n entendi completamente algum dos parametros que passamos durante o shmget como: IPC_EXCL | S_IRUSR | S_IWUSR. Vou tentar perguntar em sala ou pesquisar eu mesmo. Além disso foi mais facil do que imaginei usar uma matriz em shared memorys diferentes.
+
+
+2)
+Codigo:------------------------------------------
+
++++++++++++++++++++++++++++++++++++++++++++++++++
+//ex2.c
+
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
+
+
+int main (int argc, char *argv[])
+{
+//Prefiri puxar um numero em vez de uma mesagem do dia para deixar mais simples, não acho que vá alterar muita coisa(além do espaço alocado na memória compartilhada)
+
+//minhas variaveis 
+int segmento, *p, id, pid, status;
+int n;
+
+//processo da memoria compartilhada
+segmento = shmget (8752, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+p = (int *) shmat (segmento, 0, 0); // comparar o retorno com -1
+
+
+//pegando algo pelo stin
+printf("(Pai // Pid: %d) Digite um numero inteiro:",getpid());
+fscanf(stdin,"%d", p);
+
+pid = fork();
+
+if(pid==0){
+//Prefiri tranformar um filho no cliente. Para só chamar um programa.
+execl("./cliente", "cliente",NULL);
+exit(0);
+
+}
+else{
+waitpid(-1, NULL, 0);
+
+//Tirando a memoria alocada
+shmdt(p);
+shmctl(segmento,IPC_RMID,NULL);
+}
+
+return 0;
+}
++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+//Cliente.c
+
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
+
+
+int main (int argc, char *argv[])
+{
+
+//minhas variaveis 
+int segmento, *p, id, pid, status;
+int n;
+
+//processo da memoria compartilhada
+segmento = shmget (8752, sizeof (int),0);
+p = (int *) shmat (segmento, 0, 0); // comparar o retorno com -1
+
+//mesangem só em caso de erro
+if (p == (void *) -1) {
+        perror("Erro ao acoplar memória (shmat)");
+        exit(1);
+    }
+
+printf("(Cliente // pid %d): %d\n",getpid(),*p);
+
+// não sabia se precisa fazer ou não mas fiz
+shmdt(p);
+
+return 0;
+}
+
+
+Comandos:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o e2 ex2.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o cliente cliente.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ ./e2
+
+Prompt:------------------------------------------
+(Pai // Pid: 14534) Digite um numero inteiro:45600
+(Cliente // pid 14578): 45600
+
+Entendimento:------------------------------------------
+
+Consegui entender melhor como funcionava o processo de transformar um filho em outro processo(antes de fazer isso tinha tentado fazer como coisas separadas até eu lembrar do exec). Ficou bem mais facil depois que eu fiz isso. Além disso entendi uma pouco mais sobre como fazer o attach caso aquele espaço da memoria já exita(ou seja não usar o IPC_CREAT). Dei uma mini simplificado no exercicio usando ints mas n acho que isso tenha afetado muita coisa.
+
+Preciso depois perguntar se eu precisa colocar o exit() no programa pai, ou se o return 0 já mata o filho de uma vez. Também desaloquei a memoria por segurança.
+
+
+3)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
+#include <time.h>
+
+int main() {
+// Tentei simplificar o maximo possivel esse exercicio pq tava achando muito dificil. As modificações que eu fiz foram, os 4 processor vão procurar entre 16 ints(4 para cada) e todos os ints fora a chave estão vazio e o com a chave tem 1. Além disso só para saber quem achou e não achou imprimi o pid. O que muda não é o valor e sim qual int desses 16 estarão com 1. Foi oque achei mais facil simples de fazer. Pesquisei como randomizar(faz muito tempo que não usava)
+
+// variaveis
+int segmento, *vetor, i;
+int alvo = 1;
+int tamanho = 16;
+
+//Processo de alocar memoria
+segmento = shmget(IPC_PRIVATE, tamanho * sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR );
+vetor = (int *) shmat(segmento, 0, 0);
+
+//Preparando vetor e sorteio
+for(i = 0; i < tamanho; i++) vetor[i] = 0;
+
+srand(time(NULL));
+int sorte = rand() % tamanho;
+vetor[sorte] = alvo; 
+
+printf("O Numero estará na posicao %d.\n", sorte);
+
+//Processo de Busca
+printf("Iniciando da Busca");
+for (i = 0; i < 4; i++) {
+    if (fork() == 0) {
+
+        int inicio = i * 4;
+        int fim = inicio + 4;
+        int achei = 0;
+
+        for (int j = inicio; j < fim; j++) {
+            if (vetor[j] == alvo) {
+                printf("PID %d: Estavana posicao %d.\n", getpid(), j);
+                achei = 1;
+            }
+        }
+
+        if (!achei) {
+            printf(" PID %d: Não achei (pos %d-%d).\n", getpid(), inicio, fim-1);
+        }
+        
+        shmdt(vetor);
+        exit(0); 
+    }
+}
+
+for (i = 0; i < 4; i++) wait(NULL);
+
+//Libera Memória
+shmdt(vetor);
+shmctl(segmento, IPC_RMID, NULL); 
+
+printf("\nFim.\n");
+return 0;
+}
+
+Comandos:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ gcc -o e3 ex3.c
+@luangib ➜ /workspaces/inf1316/lab2 (main) $ ./e3
+
+Prompt:------------------------------------------
+O Numero estará na posicao 10.
+Iniciando da BuscaPID 27987: Estavana posicao 10.
+Iniciando da Busca PID 27985: Não achei (pos 0-3).
+Iniciando da Busca PID 27986: Não achei (pos 4-7).
+Iniciando da Busca PID 27988: Não achei (pos 12-15).
+Iniciando da Busca
+Fim.
+
+Entendimento:------------------------------------------
+Tive um pouco de problema com a interpretação da questão, já que de primeira eu n tinha entendido oque era pra fazer. Depois de um tempo entendi.
+
+Dei uma boa simplificada na questão(sem mudar muita coisa). Consegui enteder bem como funcionaca a parte dividir algumas tarefas maiores em pequenas tarefas e resolve-las em paralelo. Não achei muito dificil mas, tive de colocar bastante informação visual para consegui mostrar oque tava acontendo, coloquei tanto que area cada uma epxlorou como que resultado obteve. 

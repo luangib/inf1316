@@ -1,9 +1,13 @@
+//ex2.c
+
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <stdlib.h>
 
 
 int main (int argc, char *argv[])
@@ -21,7 +25,7 @@ p = (int *) shmat (segmento, 0, 0); // comparar o retorno com -1
 
 
 //pegando algo pelo stin
-printf("Digite um numero inteiro:");
+printf("(Pai // Pid: %d) Digite um numero inteiro:",getpid());
 fscanf(stdin,"%d", p);
 
 pid = fork();
