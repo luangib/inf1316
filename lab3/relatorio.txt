@@ -1,0 +1,130 @@
+Atividade: Lab 3 - INF1316 (de 2026.1)
+Nome: Luan Fnracisco Gibson Coutinho
+MAtricula: 2411167
+
++--------------------------------------------------+
+        Padrão de reposta
+        n)
+        Codigo:------------------------------------------
+
+
+        Comandos:------------------------------------------
+
+
+        Prompt:------------------------------------------
+
+
+        Entendimento:------------------------------------------
+
+        +--------------------------------------------------+
+
+
+
+
+
++--------------------------------------------------+
+1)
+Codigo:------------------------------------------
+// ctrl-c.c
+
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#define EVER ;;
+void intHandler(int sinal);
+void quitHandler(int sinal);
+int main (void)
+{
+void (*p)(int); // ponteiro para função que recebe int como
+// parâmetro
+p = signal(SIGINT, intHandler);
+printf("Endereco do manipulador anterior %p\n", p);
+p = signal(SIGQUIT, quitHandler);
+printf("Endereco do manipulador anterior %p\n", p);
+puts ("Ctrl-C desabilitado. Use Ctrl-\\ para terminar");
+for(EVER);
+}
+void intHandler(int sinal)
+{
+printf("Você pressionou Ctrl-C (%d) \n", sinal);
+}
+void quitHandler(int sinal)
+{
+printf("Terminando o processo...\n");
+exit (0);
+}
+
+
+Comandos:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ gcc -o ex1 ex1.c
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex1
+
+
+Prompt:------------------------------------------
+Endereco do manipulador anterior (nil)
+Endereco do manipulador anterior (nil)
+Ctrl-C desabilitado. Use Ctrl-\ para terminar
+^CVocê pressionou Ctrl-C (2) 
+^CVocê pressionou Ctrl-C (2) 
+^CVocê pressionou Ctrl-C (2) 
+
+Entendimento:------------------------------------------
+Ele conseguui eralmente desabilitar o meu ctrl-c mas por algum moitov o ctrl-\ não fez o programa parar de rodar, acho que tem algo haver com eu usar o codesapces
++--------------------------------------------------+
+
+
+
++--------------------------------------------------+
+2)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define EVER ;;
+void killHandler(int sinal);
+int main (void)
+{
+void (*p)(int); // ponteiro para função que recebe int como
+// parâmetro
+printf("Pid do processo: %d\n", getpid());
+p = signal(SIGKILL, SIG_IGN);
+printf("Endereco do manipulador anterior %p\n", p);
+puts ("Tentando Desabilitar o kill");
+for(EVER);
+}
+// vou passar kill –s SIGKILL <PID>, com o pid que aparecer no print
+
+
+Comandos e Prompt(ta tudo junto dessa vez):------------------------------------------
+
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex2 &
+[1] 13945
+Pid do processo: 13945
+Endereco do manipulador anterior 0xffffffffffffffff
+Tentando Desabilitar o kill
+
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ kill –s SIGKILL 13945
+bash: kill: –s: arguments must be process or job IDs
+bash: kill: SIGKILL: arguments must be process or job IDs
+[1]+  Terminated              ./ex2
+
+Entendimento:------------------------------------------
+É impossivel ignorar o KIll e ele vai terminar o programa a força, independentemente de o codigo tentar trata-lo ou ignora-lo.
+
++--------------------------------------------------+
+
+3)
+
+Codigo:------------------------------------------
+
+
+Comandos:------------------------------------------
+
+
+Prompt:------------------------------------------
+
+
+Entendimento:------------------------------------------
+
