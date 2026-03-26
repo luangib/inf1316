@@ -464,10 +464,4 @@ Multiplicação: 0
 
 
 Entendimento:------------------------------------------
-
-@luangib ➜ /workspaces/inf1316/lab3 (main) $ gcc -o ex5 ex5.c
-@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex5
-Digite o 1º número (inteiro): 1
-Digite o 2º número (inteiro 0): 0
-
-[SINAL] Recebi um SIGFPE
+Percebi que se usar float, o C não trava e só mostra inf na divisão, mas quando mudei para int,  o sistema mandou o SIGFPE na hora. Entendi que esse sinal serve para o hardware avisar que houve um erro matemático fatal, e capturando ele eu consigo dar um aviso personalizado antes do programa crashar de vez.
