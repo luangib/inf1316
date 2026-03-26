@@ -1,5 +1,5 @@
 Atividade: Lab 3 - INF1316 (de 2026.1)
-Nome: Luan Fnracisco Gibson Coutinho
+Nome: Luan Francisco Gibson Coutinho
 MAtricula: 2411167
 
 +--------------------------------------------------+
@@ -118,13 +118,356 @@ Entendimento:------------------------------------------
 3)
 
 Codigo:------------------------------------------
+//ex3.c
 
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+void childhandler(int signo);
+int delay;
+
+int main (int argc, char *argv[])
+{
+    pid_t pid;
+
+    // Verificação: ./ex3 <tempo_limite> <tipo_filho>
+    // tipo_filho deve ser 'r' para rapido ou 'l' para lento
+    if (argc < 3) {
+        fprintf(stderr, "Uso: %s <tempo_limite> <r/l>\n", argv[0]);
+        fprintf(stderr, "Ex: ./ex3 10 r  (para rodar o filho_rapido)\n");
+        exit(-1);
+    }
+
+    sscanf(argv[1], "%d", &delay); 
+    signal(SIGCHLD, childhandler);
+
+    if ((pid = fork()) < 0)
+    {
+        fprintf(stderr, "Erro ao criar filho\n");
+        exit(-1);
+    }
+
+    if (pid == 0) /* FILHO */
+    {
+        // Definindo os caminhos fixos e argumentos para o execve
+        char *caminho;
+        if (argv[2][0] == 'r') {
+            caminho = "./filho_rapido";
+        } else {
+            caminho = "./filho_lento";
+        }
+
+        char *args[] = {caminho, NULL}; // O primeiro argumento é o próprio nome
+        char *env[] = {NULL};           // Ambiente vazio
+
+        printf("[FILHO] Vou executar o programa: %s\n", caminho);
+        
+        // Chamada oficial do execve
+        execve(caminho, args, env);
+
+        // Se o arquivo não existir ou não tiver permissão, o código abaixo roda:
+        perror("Erro ao executar o execve (verifique se compilou os filhos)");
+        exit(-1);
+    }
+    else /* PAI */
+    {
+        printf("[PAI] Monitorando por %d segundos...\n", delay);
+        sleep(delay);
+
+        // Se o pai acordar e o handler não tiver encerrado, mata o filho
+        printf("\n[PAI] Tempo esgotado! Matando o processo filho %d...\n", pid);
+        kill(pid, SIGKILL);
+        
+        sleep(1); 
+    }
+
+    return 0;
+}
+
+void childhandler(int signo) 
+{
+    int status;
+    pid_t pid = wait(&status);
+    
+    if (WIFEXITED(status)) {
+        printf("\n[HANDLER] Filho %d terminou normalmente (Status: %d).\n", pid, WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+        printf("\n[HANDLER] Filho %d foi encerrado pelo sinal %d (FILHOCIDIO).\n", pid, WTERMSIG(status));
+    }
+    
+    exit(0); 
+}
++---------------------------------------------------+
+//filho_lento.c
+
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    printf("Filho: Começando execução longa (20s)...\n");
+    sleep(20);
+    printf("Filho: Isso não deve aparecer se o pai me matar!\n");
+    return 0;
+}
++----------------------------------------------------+
+//filho_rapido.c
+
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    printf("Filho: Começando execução rápida...\n");
+    sleep(2); 
+    printf("Filho: Terminei meu trabalho!\n");
+    return 0;
+}
+
+Comandos e Promopt:------------------------------------------
+
+gcc filho_rapido.c -o filho_rapido
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ gcc filho_lento.c -o filho_lento
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex3 5 l
+[PAI] Monitorando por 5 segundos...
+[FILHO] Vou executar o programa: ./filho_lento
+Filho: Começando execução longa (20s)...
+
+[PAI] Tempo esgotado! Matando o processo filho 5338...
+
+[HANDLER] Filho 5338 foi encerrado pelo sinal 9 (FILHOCIDIO).
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex3 5 r
+[PAI] Monitorando por 5 segundos...
+[FILHO] Vou executar o programa: ./filho_rapido
+Filho: Começando execução rápida...
+Filho: Terminei meu trabalho!
+
+[HANDLER] Filho 5518 terminou normalmente (Status: 0).
+
+
+Entendimento:------------------------------------------
+Neste exercício, usei o fork() para criar um processo pai que vigia o filho enquanto ele executa programas como o filho_lento. Entendi que o sinal SIGCHLD avisa o pai na hora se o filho terminar cedo, mas se o filho demorar demais e passar do tempo, o pai usa o SIGKILL para encerrar o filho à força.
+
+
+4)
+Codigo:------------------------------------------
+// ex4.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+int main() {
+    pid_t filho1, filho2;
+
+    // Criando o primeiro filho
+    filho1 = fork();
+    if (filho1 == 0) {
+        while(1) {
+            printf("Filho 1 rodando... (PID: %d)\n", getpid());
+            sleep(1);
+        }
+    }
+
+    // Criando o segundo filho
+    filho2 = fork();
+    if (filho2 == 0) {
+        while(1) {
+            printf("Filho 2 rodando... (PID: %d)\n", getpid());
+            sleep(1);
+        }
+    }
+
+    // --- CÓDIGO DO PAI (ESCALONADOR) ---
+    
+    // Inicialmente, paramos os dois para começar o controle
+    kill(filho1, SIGSTOP);
+    kill(filho2, SIGSTOP);
+
+    int trocas = 0;
+    pid_t atual = filho1;
+    pid_t espera = filho2;
+
+    printf("\n[PAI] Iniciando escalonamento (10 trocas)...\n\n");
+
+    while (trocas < 10) {
+        printf("\n--- Troca %d ---\n", trocas + 1);
+        
+        // 1. Manda quem está esperando rodar
+        printf("[PAI] Acordando processo %d\n", atual);
+        kill(atual, SIGCONT);
+        
+        // 2. Deixa ele rodar por um tempo (fatia de tempo/quantum)
+        sleep(2); 
+
+        // 3. Manda ele parar para dar a vez ao outro
+        printf("[PAI] Pausando processo %d\n", atual);
+        kill(atual, SIGSTOP);
+
+        // 4. Alterna quem é o próximo
+        pid_t temp = atual;
+        atual = espera;
+        espera = temp;
+
+        trocas++;
+    }
+
+    // Fim das 10 trocas: Hora do "limpa"
+    printf("\n[PAI] 10 trocas atingidas. Encerrando filhos...\n");
+    kill(filho1, SIGKILL);
+    kill(filho2, SIGKILL);
+
+    // Espera os processos serem removidos da tabela do SO
+    wait(NULL);
+    wait(NULL);
+
+    printf("[PAI] Fim do programa.\n");
+    return 0;
+}
 
 Comandos:------------------------------------------
-
+gcc -o ex4 ex4.c
+./ex4
 
 Prompt:------------------------------------------
 
 
+[PAI] Iniciando escalonamento (10 trocas)...
+
+
+--- Troca 1 ---
+[PAI] Acordando processo 6738
+Filho 1 rodando... (PID: 6738)
+Filho 1 rodando... (PID: 6738)
+[PAI] Pausando processo 6738
+
+--- Troca 2 ---
+[PAI] Acordando processo 6739
+Filho 2 rodando... (PID: 6739)
+Filho 2 rodando... (PID: 6739)
+[PAI] Pausando processo 6739
+
+--- Troca 3 ---
+[PAI] Acordando processo 6738
+Filho 1 rodando... (PID: 6738)
+Filho 1 rodando... (PID: 6738)
+[PAI] Pausando processo 6738
+
+--- Troca 4 ---
+[PAI] Acordando processo 6739
+Filho 2 rodando... (PID: 6739)
+Filho 2 rodando... (PID: 6739)
+[PAI] Pausando processo 6739
+
+--- Troca 5 ---
+[PAI] Acordando processo 6738
+Filho 1 rodando... (PID: 6738)
+Filho 1 rodando... (PID: 6738)
+[PAI] Pausando processo 6738
+
+--- Troca 6 ---
+[PAI] Acordando processo 6739
+Filho 2 rodando... (PID: 6739)
+Filho 2 rodando... (PID: 6739)
+Filho 2 rodando... (PID: 6739)
+[PAI] Pausando processo 6739
+
+--- Troca 7 ---
+[PAI] Acordando processo 6738
+Filho 1 rodando... (PID: 6738)
+Filho 1 rodando... (PID: 6738)
+[PAI] Pausando processo 6738
+
+--- Troca 8 ---
+[PAI] Acordando processo 6739
+Filho 2 rodando... (PID: 6739)
+Filho 2 rodando... (PID: 6739)
+[PAI] Pausando processo 6739
+
+--- Troca 9 ---
+[PAI] Acordando processo 6738
+Filho 1 rodando... (PID: 6738)
+Filho 1 rodando... (PID: 6738)
+[PAI] Pausando processo 6738
+
+--- Troca 10 ---
+[PAI] Acordando processo 6739
+Filho 2 rodando... (PID: 6739)
+Filho 2 rodando... (PID: 6739)
+[PAI] Pausando processo 6739
+
+[PAI] 10 trocas atingidas. Encerrando filhos...
+[PAI] Fim do programa.
+
 Entendimento:------------------------------------------
 
+Percebi que acontece um descompasso porque o tempo que o pai libera pro filho (sleep(2)) é o dobro do tempo do loop do próprio filho (sleep(1)), o que geralmente garante 2 execuções, mas as vezes acontece um "atraso"  que deixa escapar uma 3ª. Não sei exatamente o porque mas acho que tem haver com algum tipo de imprecisão do sleep.
+
++--------------------------------------------------+
+
+5)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+
+void trata_fpe(int sinal) {
+    printf("\n[SINAL] Recebi um SIGFPE\n");
+    exit(1);
+}
+
+int main() {
+    int n1, n2; 
+
+    signal(SIGFPE, trata_fpe);
+
+    printf("Digite o 1º número (inteiro): ");
+    scanf("%d", &n1);
+    printf("Digite o 2º número (inteiro 0): ");
+    scanf("%d", &n2);
+
+    printf("\n--- Resultados ---\n");
+    printf("Soma: %d\n", n1 + n2);
+    printf("Subtração: %d\n", n1 - n2);
+    printf("Multiplicação: %d\n", n1 * n2);
+    printf("Divisão: %d\n", n1 / n2); 
+
+    return 0;
+}
+
+Comandos e Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ gcc -o ex5 ex5.c
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex5
+Digite o 1º número (inteiro): 4
+Digite o 2º número (inteiro 0): 1
+
+--- Resultados ---
+Soma: 5
+Subtração: 3
+Multiplicação: 4
+Divisão: 4
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex5
+Digite o 1º número (inteiro): 1
+Digite o 2º número (inteiro 0): 0
+
+--- Resultados ---
+Soma: 1
+Subtração: 1
+Multiplicação: 0
+
+[SINAL] Recebi um SIGFPE
+
+
+Entendimento:------------------------------------------
+
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ gcc -o ex5 ex5.c
+@luangib ➜ /workspaces/inf1316/lab3 (main) $ ./ex5
+Digite o 1º número (inteiro): 1
+Digite o 2º número (inteiro 0): 0
+
+[SINAL] Recebi um SIGFPE
