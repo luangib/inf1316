@@ -1,0 +1,1 @@
+Estes dados foram lidos do arquivo de entrada e redirecionados para o arquivo de saída! Sistemas Operacionais é show.

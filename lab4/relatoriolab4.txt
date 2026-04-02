@@ -1,0 +1,360 @@
+Atividade: Lab 4 - INF1316 (de 2026.1)
+Nome: Luan Francisco Gibson Coutinho
+Matricula: 2411167
+
++--------------------------------------------------+
+        Padrão de reposta
+n)
+Codigo:------------------------------------------
+
+
+Comandos:------------------------------------------
+
+
+Prompt:------------------------------------------
+
+
+Entendimento:------------------------------------------
+
++--------------------------------------------------+
+
+
+1)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(int argc, char *argv[]) {
+    int fd[2]; 
+    pid_t pid;
+    int nDadosTx, nDadosRx;
+    
+    const char mensagem_filho[] = "Olá Pai, mensagem enviada via pipe!";
+    char buffer_pai[100];
+
+    
+    if (pipe(fd) < 0) { 
+        puts("Erro ao abrir os pipes");
+        exit(-1);
+    }
+
+    pid = fork();
+
+    if (pid < 0) {
+        perror("Erro no fork");
+        exit(-1);
+    }
+
+    if (pid == 0) {
+        /* PROCESSO FILHO (Escritor) */
+        
+       
+        close(fd[0]);
+        
+        
+        nDadosTx = write(fd[1], mensagem_filho, strlen(mensagem_filho) + 1);
+        printf("Filho: %d dados escritos. Conteúdo: \"%s\"\n", nDadosTx, mensagem_filho);
+        
+        
+        close(fd[1]); 
+        exit(0);
+        
+    } else {
+        /* PROCESSO PAI (Leitor) */
+        
+        
+        close(fd[1]); 
+        
+       
+        nDadosRx = read(fd[0], buffer_pai, sizeof(buffer_pai));
+        printf("Pai: %d dados lidos. Conteúdo: \"%s\"\n", nDadosRx, buffer_pai);
+        
+        
+        close(fd[0]); 
+        wait(NULL);
+    }
+
+    return 0;
+}
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ gcc -o e1 e1.c
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ ./e1
+Filho: 37 dados escritos. Conteúdo: "Olá Pai, mensagem enviada via pipe!"
+Pai: 37 dados lidos. Conteúdo: "Olá Pai, mensagem enviada via pipe!"
+
+
+Entendimento:------------------------------------------
+Entendimento:------------------------------------------
+
+Neste exercício, criamos um canal de comunicação de via unica entre dois processos: um pai e um filho. O processo filho  envia uma mensagem de texto por esse tubo. O processo pai, que está do outro lado, aguarda a chegada dessa mensagem, faz a leitura e a exibe na tela. Mostra na  prática de como a comunicação básica entre processos funciona.
++--------------------------------------------------+
+
+
+2)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h> 
+
+int main() {
+    int fd_in, fd_out;
+    char buffer[1024];
+    ssize_t bytes_lidos;
+
+    fd_in = open("entrada.txt", O_RDONLY);
+    if (fd_in < 0) {
+        perror("Erro ao abrir entrada.txt (crie o arquivo antes de rodar)");
+        exit(1);
+    }
+
+    
+    fd_out = open("saida.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd_out < 0) {
+        perror("Erro ao abrir saida.txt");
+        close(fd_in);
+        exit(1);
+    }
+
+    //Redireciona a entrada padrão
+    if (dup2(fd_in, 0) == -1) {
+        perror("Erro no dup2 para stdin");
+        exit(1);
+    }
+
+    //Redireciona a saída padrão
+    if (dup2(fd_out, 1) == -1) {
+        perror("Erro no dup2 para stdout");
+        exit(1);
+    }
+
+  
+    close(fd_in);
+    close(fd_out);
+
+    //Loop de leitura e escrita
+    while ((bytes_lidos = read(0, buffer, sizeof(buffer))) > 0) {
+        write(1, buffer, bytes_lidos);
+    }
+
+    if (bytes_lidos < 0) {
+        perror("Erro durante a leitura");
+        exit(1);
+    }
+
+    return 0;
+}
+
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ echo "Estes dados foram lidos do arquivo de entrada e redirecionados para o arquivo de saída! Sistemas Operacionais é show." > entrada.txt
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ gcc -o e2 e2.c
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ ./e2
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ cat saida.txt
+Estes dados foram lidos do arquivo de entrada e redirecionados para o arquivo de saída! Sistemas Operacionais é show.
+
+Entendimento:------------------------------------------
+Entendimento:------------------------------------------
+
+O objetivo aqui foi alterar o fluxo natural de informações do programa. Normalmente, um programa lê dados do teclado e escreve na tela. Usando a função de dup eu engano o processo e ele passa a ler os dados de dentro de um arquivo existente (entrada.txt) e a escrever sua resposta em um novo arquivo (saida.txt), sem passar pela tela do terminal.
++--------------------------------------------------+
+
+
+3)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main() {
+    int fd[2];
+    pid_t pid;
+
+    // Cria o pipe de comunicação
+    if (pipe(fd) < 0) {
+        perror("Erro ao criar o pipe");
+        exit(1);
+    }
+
+    // Cria o processo filho
+    pid = fork();
+
+    if (pid < 0) {
+        perror("Erro no fork");
+        exit(1);
+    }
+
+    if (pid == 0) {
+        // PROCESSO FILHO: vai executar o 'ps'
+        
+       
+        close(fd[0]);
+        
+        if (dup2(fd[1], 1) == -1) {
+            perror("Erro no dup2 do filho");
+            exit(1);
+        }
+        
+       
+        close(fd[1]);
+
+       
+        execlp("ps", "ps", NULL);
+        
+        
+        perror("Erro ao executar o ps");
+        exit(1);
+        
+    } else {
+        // PROCESSO PAI: vai executar o 'wc'
+        
+       
+        close(fd[1]);
+        
+       
+        if (dup2(fd[0], 0) == -1) {
+            perror("Erro no dup2 do pai");
+            exit(1);
+        }
+        
+        execlp("wc", "wc", NULL);
+        
+        
+        perror("Erro ao executar o wc");
+        exit(1);
+    }
+
+    return 0;
+}
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ gcc -o e3 e3.c
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ ./e3
+      4      16     119
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ ps | wc
+      4      16     119
+
+Entendimento:------------------------------------------
+Entendimento:------------------------------------------
+ O primeiro processo roda o comando `ps` e, em vez de mostrar na tela, joga o resultado no tubo. O segundo processo roda o comando `wc`, mas pega sua entrada do tubo em vez do teclado. A saída de um programa se torna a entrada do outro.
++--------------------------------------------------+
+
+4)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main() {
+    int fd[2];
+    pid_t pid_leitor1, pid_leitor2;
+
+    if (pipe(fd) < 0) {
+        perror("Erro ao criar a pipe");
+        exit(1);
+    }
+
+    /* ---------------- CRIANDO O PRIMEIRO LEITOR ---------------- */
+    pid_leitor1 = fork();
+    if (pid_leitor1 < 0) {
+        perror("Erro no fork do Leitor 1");
+        exit(1);
+    }
+
+    if (pid_leitor1 == 0) {
+        close(fd[1]); 
+        char buffer[50];
+        
+        
+        while (read(fd[0], buffer, sizeof(buffer)) > 0) { 
+            printf("[Leitor 1 - PID %d] consumiu: %s\n", getpid(), buffer);
+            sleep(2); // Dorme o dobro do tempo do escritor
+        }
+        
+        close(fd[0]);
+        exit(0);
+    }
+
+    /* ---------------- CRIANDO O SEGUNDO LEITOR ---------------- */
+    pid_leitor2 = fork();
+    if (pid_leitor2 < 0) {
+        perror("Erro no fork do Leitor 2");
+        exit(1);
+    }
+
+    if (pid_leitor2 == 0) {
+        close(fd[1]);
+        char buffer[50];
+        
+        while (read(fd[0], buffer, sizeof(buffer)) > 0) {
+            printf("[Leitor 2 - PID %d] consumiu: %s\n", getpid(), buffer);
+            sleep(2); // Dorme o dobro do tempo do escritor
+        }
+        
+        close(fd[0]);
+        exit(0);
+    }
+
+    /* ---------------- PROCESSO PAI (ESCRITOR) ---------------- */
+    
+    close(fd[0]);
+    char msg[50];
+
+    printf("Iniciando transmissões...\n\n");
+
+    // 6 mensagens no total
+    for (int i = 1; i <= 6; i++) {
+        snprintf(msg, sizeof(msg), "Dado #%d", i);
+        
+        // Escreve na pipe passando o tamanho exato + 1 para pegar o '\0'
+        write(fd[1], msg, strlen(msg) + 1); 
+        printf("[Escritor - PID %d] produziu: %s\n", getpid(), msg);
+        
+        sleep(1); // Escritor dorme metade do tempo dos leitores
+    }
+
+   
+    close(fd[1]); 
+
+    
+    wait(NULL);
+    wait(NULL);
+    
+    printf("\nTodos os processos finalizaram.\n");
+
+    return 0;
+}
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ gcc -o e4 e4.c
+@luangib ➜ /workspaces/inf1316/lab4 (main) $ ./e4
+Iniciando transmissões...
+
+[Escritor - PID 15959] produziu: Dado #1
+[Leitor 1 - PID 15960] consumiu: Dado #1
+[Escritor - PID 15959] produziu: Dado #2
+[Leitor 2 - PID 15961] consumiu: Dado #2
+[Escritor - PID 15959] produziu: Dado #3
+[Leitor 1 - PID 15960] consumiu: Dado #3
+[Escritor - PID 15959] produziu: Dado #4
+[Leitor 2 - PID 15961] consumiu: Dado #4
+[Escritor - PID 15959] produziu: Dado #5
+[Leitor 1 - PID 15960] consumiu: Dado #5
+[Escritor - PID 15959] produziu: Dado #6
+[Leitor 2 - PID 15961] consumiu: Dado #6
+
+Todos os processos finalizaram.
+
+Entendimento:------------------------------------------
+Entendimento:------------------------------------------
+Criei um cenário com um produtor e dois consumidores dividindo o mesmo pipe. Como a informação desaparece do pipe assim que é lida, os dois leitores acabam competindo pelas mensagens.
+
+Configurei tempos de pausa (sleep) diferentes para cada um e observei no terminal que eles se revezam naturalmente para pegar as informações. Isso mais ou menos mostra que o pipe não tem um destinatário fixo assim o dado vai simplesmente para quem estiver pronto para ler primeiro.
++--------------------------------------------------+
