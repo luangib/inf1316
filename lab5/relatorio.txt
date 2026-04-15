@@ -1,0 +1,698 @@
+Atividade: Lab 4 - INF1316 (de 2026.1)
+Nome: Luan Francisco Gibson Coutinho
+Matricula: 2411167
+
++--------------------------------------------------+
+        Padrão de reposta
+n)
+Codigo:------------------------------------------
+
+
+Comandos:------------------------------------------
+
+
+Prompt:------------------------------------------
+
+
+Entendimento:------------------------------------------
+
++--------------------------------------------------+
+
+
+1)
+
+Prompt:------------------------------------------
+
+@luangib ➜ /workspaces/inf1316/lab5 (main) $ ./ex1
+Corrida iniciada ... 
+Sapo 2 pulou
+Sapo 0 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 1 pulou
+Sapo 0 pulou
+Sapo 2 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 1 pulou
+Sapo 4 pulou
+Sapo 3 chegou na posicaoo 1 com 2 pulos
+Sapo 0 chegou na posicaoo 2 com 2 pulos
+Sapo 4 chegou na posicaoo 3 com 3 pulos
+Sapo 1 chegou na posicaoo 1 com 2 pulos
+Sapo 2 chegou na posicaoo 1 com 2 pulos
+
+Entendimento:------------------------------------------
+Oqu eue entendi é que suas threads que não estão sincronizadas podem acabar por pegar a mesma posição já que acabaram ao mesmo tempo. Tive que rodar algumas vezes para conseguir entender oque estava acontecendo.
+
+
+2)
+Codigo:------------------------------------------
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define NUM_THREADS 5 
+#define PULO_MAXIMO 100 
+#define DESCANSO_MAXIMO 2
+#define DISTANCIA_PARA_CORRER 500 
+
+
+static int classificacao = 1;
+static pthread_mutex_t lock;
+
+void *Correr(void *sapo) {
+    int pulos = 0;
+    int distanciaJaCorrida = 0; 
+    int id_sapo = (int)(long)sapo;
+
+    while (distanciaJaCorrida <= DISTANCIA_PARA_CORRER) { 
+        int pulo = rand() % PULO_MAXIMO; 
+        distanciaJaCorrida += pulo; 
+        pulos++;
+
+        printf("Sapo %d pulou %d cm (Total: %d cm)\n", id_sapo, pulo, distanciaJaCorrida);
+        
+        int descanso = rand() % DESCANSO_MAXIMO; 
+        sleep(descanso); 
+    }
+
+    pthread_mutex_lock(&lock); 
+    
+    printf("\n>>> Sapo %d CHEGOU! Posicao: %d (Total de pulos: %d)\n\n", 
+            id_sapo, classificacao, pulos); 
+    
+    classificacao++; 
+    
+    pthread_mutex_unlock(&lock); 
+    
+
+    pthread_exit(NULL); 
+}
+
+int main() {
+    pthread_t threads[NUM_THREADS]; 
+    int t;
+
+    
+    pthread_mutex_init(&lock, NULL);
+
+    printf("Corrida iniciada ... \n"); 
+
+    for(t = 0; t < NUM_THREADS; t++) { 
+        
+        pthread_create(&threads[t], NULL, Correr, (void *)(long)t); 
+    }
+
+    for(t = 0; t < NUM_THREADS; t++) { 
+        
+        pthread_join(threads[t], NULL); 
+    }
+
+    printf("\nAcabou!!\n"); 
+    
+    
+    pthread_mutex_destroy(&lock);
+
+    return 0;
+}
+
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab5 (main) $ ./ex2
+Corrida iniciada ... 
+Sapo 0 pulou 83 cm (Total: 83 cm)
+Sapo 1 pulou 86 cm (Total: 86 cm)
+Sapo 2 pulou 93 cm (Total: 93 cm)
+Sapo 3 pulou 35 cm (Total: 35 cm)
+Sapo 4 pulou 49 cm (Total: 49 cm)
+Sapo 3 pulou 62 cm (Total: 97 cm)
+Sapo 2 pulou 27 cm (Total: 120 cm)
+Sapo 3 pulou 63 cm (Total: 160 cm)
+Sapo 3 pulou 40 cm (Total: 200 cm)
+Sapo 3 pulou 72 cm (Total: 272 cm)
+Sapo 3 pulou 11 cm (Total: 283 cm)
+Sapo 3 pulou 67 cm (Total: 350 cm)
+Sapo 4 pulou 82 cm (Total: 131 cm)
+Sapo 2 pulou 62 cm (Total: 182 cm)
+Sapo 1 pulou 67 cm (Total: 153 cm)
+Sapo 0 pulou 29 cm (Total: 112 cm)
+Sapo 4 pulou 22 cm (Total: 153 cm)
+Sapo 4 pulou 69 cm (Total: 222 cm)
+Sapo 0 pulou 93 cm (Total: 205 cm)
+Sapo 3 pulou 11 cm (Total: 361 cm)
+Sapo 0 pulou 29 cm (Total: 234 cm)
+Sapo 3 pulou 21 cm (Total: 382 cm)
+Sapo 2 pulou 84 cm (Total: 266 cm)
+Sapo 1 pulou 98 cm (Total: 251 cm)
+Sapo 1 pulou 15 cm (Total: 266 cm)
+Sapo 4 pulou 70 cm (Total: 292 cm)
+Sapo 0 pulou 91 cm (Total: 325 cm)
+Sapo 1 pulou 56 cm (Total: 322 cm)
+Sapo 3 pulou 62 cm (Total: 444 cm)
+Sapo 0 pulou 96 cm (Total: 421 cm)
+Sapo 3 pulou 5 cm (Total: 449 cm)
+Sapo 2 pulou 84 cm (Total: 350 cm)
+Sapo 4 pulou 36 cm (Total: 328 cm)
+Sapo 1 pulou 46 cm (Total: 368 cm)
+Sapo 0 pulou 13 cm (Total: 434 cm)
+Sapo 3 pulou 24 cm (Total: 473 cm)
+Sapo 2 pulou 82 cm (Total: 432 cm)
+Sapo 4 pulou 14 cm (Total: 342 cm)
+Sapo 1 pulou 34 cm (Total: 402 cm)
+Sapo 3 pulou 43 cm (Total: 516 cm)
+Sapo 1 pulou 8 cm (Total: 410 cm)
+Sapo 0 pulou 50 cm (Total: 484 cm)
+Sapo 1 pulou 88 cm (Total: 498 cm)
+Sapo 0 pulou 3 cm (Total: 487 cm)
+Sapo 1 pulou 54 cm (Total: 552 cm)
+Sapo 2 pulou 32 cm (Total: 464 cm)
+Sapo 2 pulou 76 cm (Total: 540 cm)
+
+>>> Sapo 2 CHEGOU! Posicao: 1 (Total de pulos: 8)
+
+Sapo 4 pulou 39 cm (Total: 381 cm)
+Sapo 4 pulou 26 cm (Total: 407 cm)
+
+>>> Sapo 3 CHEGOU! Posicao: 2 (Total de pulos: 13)
+
+Sapo 4 pulou 94 cm (Total: 501 cm)
+Sapo 0 pulou 95 cm (Total: 582 cm)
+
+>>> Sapo 1 CHEGOU! Posicao: 3 (Total de pulos: 10)
+
+
+>>> Sapo 0 CHEGOU! Posicao: 4 (Total de pulos: 10)
+
+
+>>> Sapo 4 CHEGOU! Posicao: 5 (Total de pulos: 10)
+
+
+Acabou!!
+
+Entendimento:------------------------------------------
+
+Consegui entender como A partir do uso do mutex fica muito mais facil de sincronizar as coisas. Já que logo antes de momentos crucias(ou seja que podem criar aquele erro de duas conseguirem a mesma posição), podemos simplismente dar lock e só um deles poserá efetuar aquela tarefa. A unica coisa que não sabia se era possível acontecer era se os dois executassem o llock ao mesmo tempo(não acho que seja uma pergunta viavel pois acho que necessariamente algum deles faz isso um pouco mais rapido).
+
+
+3)
+Codigo:------------------------------------------
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define MAXFILA 8
+#define TOTAL_ELEMENTOS 64
+
+
+int buffer[MAXFILA];
+int count = 0; 
+int in = 0;    
+int out = 0;   
+
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t can_produce = PTHREAD_COND_INITIALIZER;
+pthread_cond_t can_consume = PTHREAD_COND_INITIALIZER;
+
+void* produtor(void* arg) {
+    for (int i = 1; i <= TOTAL_ELEMENTOS; i++) {
+        pthread_mutex_lock(&mutex); 
+
+        
+        while (count == MAXFILA) {
+            printf("Produtor: Fila cheia. Aguardando...\n");
+            pthread_cond_wait(&can_produce, &mutex);
+        }
+
+        
+        int item = (rand() % 100) + 1;
+        buffer[in] = item;
+        printf("Produtor: Inseriu %d na posicao %d (Total na fila: %d/64)\n", item, in, i);
+        
+        in = (in + 1) % MAXFILA; 
+        count++;
+
+        
+        pthread_cond_signal(&can_consume);
+        pthread_mutex_unlock(&mutex); 
+
+        sleep(1); 
+    }
+    pthread_exit(NULL);
+}
+
+void* consumidor(void* arg) {
+    for (int i = 1; i <= TOTAL_ELEMENTOS; i++) {
+        pthread_mutex_lock(&mutex);
+
+        
+        while (count == 0) {
+            printf("Consumidor: Fila vazia. Aguardando...\n");
+            pthread_cond_wait(&can_consume, &mutex);
+        }
+
+        
+        int item = buffer[out];
+        printf("Consumidor: Retirou %d da posicao %d (Total consumido: %d/64)\n", item, out, i);
+        
+        out = (out + 1) % MAXFILA; 
+        count--;
+
+        
+        pthread_cond_signal(&can_produce);
+        pthread_mutex_unlock(&mutex);
+
+        sleep(2); 
+    }
+    pthread_exit(NULL);
+}
+
+int main() {
+    pthread_t thread_prod, thread_cons;
+
+    printf("Iniciando problema do Produtor/Consumidor...\n");
+
+    
+    pthread_create(&thread_prod, NULL, produtor, NULL);
+    pthread_create(&thread_cons, NULL, consumidor, NULL);
+
+    
+    pthread_join(thread_prod, NULL);
+    pthread_join(thread_cons, NULL);
+
+    printf("Simulacao concluida com sucesso.\n");
+
+    
+    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&can_produce);
+    pthread_cond_destroy(&can_consume);
+
+    return 0;
+}
+
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab5 (main) $ ./ex3
+Iniciando problema do Produtor/Consumidor...
+Produtor: Inseriu 84 na posicao 0 (Total na fila: 1/64)
+Consumidor: Retirou 84 da posicao 0 (Total consumido: 1/64)
+Produtor: Inseriu 87 na posicao 1 (Total na fila: 2/64)
+Consumidor: Retirou 87 da posicao 1 (Total consumido: 2/64)
+Produtor: Inseriu 78 na posicao 2 (Total na fila: 3/64)
+Produtor: Inseriu 16 na posicao 3 (Total na fila: 4/64)
+Consumidor: Retirou 78 da posicao 2 (Total consumido: 3/64)
+Produtor: Inseriu 94 na posicao 4 (Total na fila: 5/64)
+Produtor: Inseriu 36 na posicao 5 (Total na fila: 6/64)
+Consumidor: Retirou 16 da posicao 3 (Total consumido: 4/64)
+Produtor: Inseriu 87 na posicao 6 (Total na fila: 7/64)
+Produtor: Inseriu 93 na posicao 7 (Total na fila: 8/64)
+Consumidor: Retirou 94 da posicao 4 (Total consumido: 5/64)
+Produtor: Inseriu 50 na posicao 0 (Total na fila: 9/64)
+Produtor: Inseriu 22 na posicao 1 (Total na fila: 10/64)
+Consumidor: Retirou 36 da posicao 5 (Total consumido: 6/64)
+Produtor: Inseriu 63 na posicao 2 (Total na fila: 11/64)
+Produtor: Inseriu 28 na posicao 3 (Total na fila: 12/64)
+Consumidor: Retirou 87 da posicao 6 (Total consumido: 7/64)
+Produtor: Inseriu 91 na posicao 4 (Total na fila: 13/64)
+Produtor: Inseriu 60 na posicao 5 (Total na fila: 14/64)
+Consumidor: Retirou 93 da posicao 7 (Total consumido: 8/64)
+Produtor: Inseriu 64 na posicao 6 (Total na fila: 15/64)
+Produtor: Inseriu 27 na posicao 7 (Total na fila: 16/64)
+Consumidor: Retirou 50 da posicao 0 (Total consumido: 9/64)
+Produtor: Inseriu 41 na posicao 0 (Total na fila: 17/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 22 da posicao 1 (Total consumido: 10/64)
+Produtor: Inseriu 27 na posicao 1 (Total na fila: 18/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 63 da posicao 2 (Total consumido: 11/64)
+Produtor: Inseriu 73 na posicao 2 (Total na fila: 19/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 28 da posicao 3 (Total consumido: 12/64)
+Produtor: Inseriu 37 na posicao 3 (Total na fila: 20/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 91 da posicao 4 (Total consumido: 13/64)
+Produtor: Inseriu 12 na posicao 4 (Total na fila: 21/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 60 da posicao 5 (Total consumido: 14/64)
+Produtor: Inseriu 69 na posicao 5 (Total na fila: 22/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 64 da posicao 6 (Total consumido: 15/64)
+Produtor: Inseriu 68 na posicao 6 (Total na fila: 23/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 27 da posicao 7 (Total consumido: 16/64)
+Produtor: Inseriu 30 na posicao 7 (Total na fila: 24/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 41 da posicao 0 (Total consumido: 17/64)
+Produtor: Inseriu 83 na posicao 0 (Total na fila: 25/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 27 da posicao 1 (Total consumido: 18/64)
+Produtor: Inseriu 31 na posicao 1 (Total na fila: 26/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 73 da posicao 2 (Total consumido: 19/64)
+Produtor: Inseriu 63 na posicao 2 (Total na fila: 27/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 37 da posicao 3 (Total consumido: 20/64)
+Produtor: Inseriu 24 na posicao 3 (Total na fila: 28/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 12 da posicao 4 (Total consumido: 21/64)
+Produtor: Inseriu 68 na posicao 4 (Total na fila: 29/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 69 da posicao 5 (Total consumido: 22/64)
+Produtor: Inseriu 36 na posicao 5 (Total na fila: 30/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 68 da posicao 6 (Total consumido: 23/64)
+Produtor: Inseriu 30 na posicao 6 (Total na fila: 31/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 30 da posicao 7 (Total consumido: 24/64)
+Produtor: Inseriu 3 na posicao 7 (Total na fila: 32/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 83 da posicao 0 (Total consumido: 25/64)
+Produtor: Inseriu 23 na posicao 0 (Total na fila: 33/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 31 da posicao 1 (Total consumido: 26/64)
+Produtor: Inseriu 59 na posicao 1 (Total na fila: 34/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 63 da posicao 2 (Total consumido: 27/64)
+Produtor: Inseriu 70 na posicao 2 (Total na fila: 35/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 24 da posicao 3 (Total consumido: 28/64)
+Produtor: Inseriu 68 na posicao 3 (Total na fila: 36/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 68 da posicao 4 (Total consumido: 29/64)
+Produtor: Inseriu 94 na posicao 4 (Total na fila: 37/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 36 da posicao 5 (Total consumido: 30/64)
+Produtor: Inseriu 57 na posicao 5 (Total na fila: 38/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 30 da posicao 6 (Total consumido: 31/64)
+Produtor: Inseriu 12 na posicao 6 (Total na fila: 39/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 3 da posicao 7 (Total consumido: 32/64)
+Produtor: Inseriu 43 na posicao 7 (Total na fila: 40/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 23 da posicao 0 (Total consumido: 33/64)
+Produtor: Inseriu 30 na posicao 0 (Total na fila: 41/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 59 da posicao 1 (Total consumido: 34/64)
+Produtor: Inseriu 74 na posicao 1 (Total na fila: 42/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 70 da posicao 2 (Total consumido: 35/64)
+Produtor: Inseriu 22 na posicao 2 (Total na fila: 43/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 68 da posicao 3 (Total consumido: 36/64)
+Produtor: Inseriu 20 na posicao 3 (Total na fila: 44/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 94 da posicao 4 (Total consumido: 37/64)
+Produtor: Inseriu 85 na posicao 4 (Total na fila: 45/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 57 da posicao 5 (Total consumido: 38/64)
+Produtor: Inseriu 38 na posicao 5 (Total na fila: 46/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 12 da posicao 6 (Total consumido: 39/64)
+Produtor: Inseriu 99 na posicao 6 (Total na fila: 47/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 43 da posicao 7 (Total consumido: 40/64)
+Produtor: Inseriu 25 na posicao 7 (Total na fila: 48/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 30 da posicao 0 (Total consumido: 41/64)
+Produtor: Inseriu 16 na posicao 0 (Total na fila: 49/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 74 da posicao 1 (Total consumido: 42/64)
+Produtor: Inseriu 71 na posicao 1 (Total na fila: 50/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 22 da posicao 2 (Total consumido: 43/64)
+Produtor: Inseriu 14 na posicao 2 (Total na fila: 51/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 20 da posicao 3 (Total consumido: 44/64)
+Produtor: Inseriu 27 na posicao 3 (Total na fila: 52/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 85 da posicao 4 (Total consumido: 45/64)
+Produtor: Inseriu 92 na posicao 4 (Total na fila: 53/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 38 da posicao 5 (Total consumido: 46/64)
+Produtor: Inseriu 81 na posicao 5 (Total na fila: 54/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 99 da posicao 6 (Total consumido: 47/64)
+Produtor: Inseriu 57 na posicao 6 (Total na fila: 55/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 25 da posicao 7 (Total consumido: 48/64)
+Produtor: Inseriu 74 na posicao 7 (Total na fila: 56/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 16 da posicao 0 (Total consumido: 49/64)
+Produtor: Inseriu 63 na posicao 0 (Total na fila: 57/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 71 da posicao 1 (Total consumido: 50/64)
+Produtor: Inseriu 71 na posicao 1 (Total na fila: 58/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 14 da posicao 2 (Total consumido: 51/64)
+Produtor: Inseriu 97 na posicao 2 (Total na fila: 59/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 27 da posicao 3 (Total consumido: 52/64)
+Produtor: Inseriu 82 na posicao 3 (Total na fila: 60/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 92 da posicao 4 (Total consumido: 53/64)
+Produtor: Inseriu 6 na posicao 4 (Total na fila: 61/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 81 da posicao 5 (Total consumido: 54/64)
+Produtor: Inseriu 26 na posicao 5 (Total na fila: 62/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 57 da posicao 6 (Total consumido: 55/64)
+Produtor: Inseriu 85 na posicao 6 (Total na fila: 63/64)
+Produtor: Fila cheia. Aguardando...
+Consumidor: Retirou 74 da posicao 7 (Total consumido: 56/64)
+Produtor: Inseriu 28 na posicao 7 (Total na fila: 64/64)
+Consumidor: Retirou 63 da posicao 0 (Total consumido: 57/64)
+Consumidor: Retirou 71 da posicao 1 (Total consumido: 58/64)
+Consumidor: Retirou 97 da posicao 2 (Total consumido: 59/64)
+Consumidor: Retirou 82 da posicao 3 (Total consumido: 60/64)
+Consumidor: Retirou 6 da posicao 4 (Total consumido: 61/64)
+Consumidor: Retirou 26 da posicao 5 (Total consumido: 62/64)
+Consumidor: Retirou 85 da posicao 6 (Total consumido: 63/64)
+Consumidor: Retirou 28 da posicao 7 (Total consumido: 64/64)
+Simulacao concluida com sucesso.
+
+Entendimento:------------------------------------------
+Entendi que além do mutex, as threads precisam conversar usando pthread_cond_wait para evitar gasto de processamento enquanto esperam. O buffer circular com % MAXFILA é muito eficiente para usar o espaço de 8 posições. Ficou claro como o produtor para ao encher a fila, esperando o sinal do consumidor para manter a tudo mais ou menos organizado.
++--------------------------------------------------+
+
+4)
+Codigo:------------------------------------------
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define MAXFILA 8
+#define TOTAL_ELEMENTOS 64
+#define NUM_PRODUTORES 2
+#define NUM_CONSUMIDORES 2
+
+int buffer[MAXFILA];
+int count = 0, in = 0, out = 0;
+int produzidos = 0, consumidos = 0;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t can_produce = PTHREAD_COND_INITIALIZER;
+pthread_cond_t can_consume = PTHREAD_COND_INITIALIZER;
+
+void* produtor(void* arg) {
+    int id = (int)(long)arg;
+    while (1) {
+        pthread_mutex_lock(&mutex);
+        if (produzidos >= TOTAL_ELEMENTOS) {
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
+        while (count == MAXFILA) {
+            pthread_cond_wait(&can_produce, &mutex);
+        }
+
+        int item = (rand() % 100) + 1;
+        buffer[in] = item;
+        produzidos++;
+        printf("Produtor %d: Inseriu %d na pos %d (%d/%d)\n", id, item, in, produzidos, TOTAL_ELEMENTOS);
+        
+        in = (in + 1) % MAXFILA;
+        count++;
+
+        pthread_cond_broadcast(&can_consume);
+        pthread_mutex_unlock(&mutex);
+        sleep(1);
+    }
+    return NULL;
+}
+
+void* consumidor(void* arg) {
+    int id = (int)(long)arg;
+    while (1) {
+        pthread_mutex_lock(&mutex);
+        if (consumidos >= TOTAL_ELEMENTOS) {
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
+        while (count == 0) {
+            pthread_cond_wait(&can_consume, &mutex);
+        }
+
+        int item = buffer[out];
+        consumidos++;
+        printf("Consumidor %d: Retirou %d da pos %d (%d/%d)\n", id, item, out, consumidos, TOTAL_ELEMENTOS);
+        
+        out = (out + 1) % MAXFILA;
+        count--;
+
+        pthread_cond_broadcast(&can_produce);
+        pthread_mutex_unlock(&mutex);
+        sleep(2);
+    }
+    return NULL;
+}
+
+int main() {
+    pthread_t prods[NUM_PRODUTORES], cons[NUM_CONSUMIDORES];
+    for (long i = 0; i < NUM_PRODUTORES; i++) pthread_create(&prods[i], NULL, produtor, (void*)i);
+    for (long i = 0; i < NUM_CONSUMIDORES; i++) pthread_create(&cons[i], NULL, consumidor, (void*)i);
+    for (int i = 0; i < NUM_PRODUTORES; i++) pthread_join(prods[i], NULL);
+    for (int i = 0; i < NUM_CONSUMIDORES; i++) pthread_join(cons[i], NULL);
+    return 0;
+}
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab5 (main) $ ./ex4
+Produtor 0: Inseriu 84 na pos 0 (1/64)
+Produtor 1: Inseriu 87 na pos 1 (2/64)
+Consumidor 0: Retirou 84 da pos 0 (1/64)
+Consumidor 1: Retirou 87 da pos 1 (2/64)
+Produtor 1: Inseriu 78 na pos 2 (3/64)
+Produtor 0: Inseriu 16 na pos 3 (4/64)
+Consumidor 0: Retirou 78 da pos 2 (3/64)
+Consumidor 1: Retirou 16 da pos 3 (4/64)
+Produtor 1: Inseriu 94 na pos 4 (5/64)
+Produtor 0: Inseriu 36 na pos 5 (6/64)
+Produtor 1: Inseriu 87 na pos 6 (7/64)
+Produtor 0: Inseriu 93 na pos 7 (8/64)
+Consumidor 1: Retirou 94 da pos 4 (5/64)
+Consumidor 0: Retirou 36 da pos 5 (6/64)
+Produtor 1: Inseriu 50 na pos 0 (9/64)
+Produtor 0: Inseriu 22 na pos 1 (10/64)
+Produtor 1: Inseriu 63 na pos 2 (11/64)
+Produtor 0: Inseriu 28 na pos 3 (12/64)
+Consumidor 1: Retirou 87 da pos 6 (7/64)
+Consumidor 0: Retirou 93 da pos 7 (8/64)
+Produtor 0: Inseriu 91 na pos 4 (13/64)
+Produtor 1: Inseriu 60 na pos 5 (14/64)
+Produtor 1: Inseriu 64 na pos 6 (15/64)
+Produtor 0: Inseriu 27 na pos 7 (16/64)
+Consumidor 1: Retirou 50 da pos 0 (9/64)
+Consumidor 0: Retirou 22 da pos 1 (10/64)
+Produtor 1: Inseriu 41 na pos 0 (17/64)
+Produtor 0: Inseriu 27 na pos 1 (18/64)
+Consumidor 1: Retirou 63 da pos 2 (11/64)
+Produtor 1: Inseriu 73 na pos 2 (19/64)
+Consumidor 0: Retirou 28 da pos 3 (12/64)
+Produtor 0: Inseriu 37 na pos 3 (20/64)
+Consumidor 0: Retirou 91 da pos 4 (13/64)
+Produtor 1: Inseriu 12 na pos 4 (21/64)
+Consumidor 1: Retirou 60 da pos 5 (14/64)
+Produtor 0: Inseriu 69 na pos 5 (22/64)
+Consumidor 1: Retirou 64 da pos 6 (15/64)
+Produtor 0: Inseriu 68 na pos 6 (23/64)
+Consumidor 0: Retirou 27 da pos 7 (16/64)
+Produtor 1: Inseriu 30 na pos 7 (24/64)
+Consumidor 1: Retirou 41 da pos 0 (17/64)
+Produtor 0: Inseriu 83 na pos 0 (25/64)
+Consumidor 0: Retirou 27 da pos 1 (18/64)
+Produtor 1: Inseriu 31 na pos 1 (26/64)
+Consumidor 1: Retirou 73 da pos 2 (19/64)
+Consumidor 0: Retirou 37 da pos 3 (20/64)
+Produtor 0: Inseriu 63 na pos 2 (27/64)
+Produtor 1: Inseriu 24 na pos 3 (28/64)
+Consumidor 1: Retirou 12 da pos 4 (21/64)
+Produtor 1: Inseriu 68 na pos 4 (29/64)
+Consumidor 0: Retirou 69 da pos 5 (22/64)
+Produtor 0: Inseriu 36 na pos 5 (30/64)
+Consumidor 1: Retirou 68 da pos 6 (23/64)
+Produtor 0: Inseriu 30 na pos 6 (31/64)
+Consumidor 0: Retirou 30 da pos 7 (24/64)
+Produtor 1: Inseriu 3 na pos 7 (32/64)
+Consumidor 1: Retirou 83 da pos 0 (25/64)
+Produtor 0: Inseriu 23 na pos 0 (33/64)
+Consumidor 0: Retirou 31 da pos 1 (26/64)
+Produtor 1: Inseriu 59 na pos 1 (34/64)
+Consumidor 1: Retirou 63 da pos 2 (27/64)
+Produtor 1: Inseriu 70 na pos 2 (35/64)
+Consumidor 0: Retirou 24 da pos 3 (28/64)
+Produtor 0: Inseriu 68 na pos 3 (36/64)
+Consumidor 1: Retirou 68 da pos 4 (29/64)
+Produtor 1: Inseriu 94 na pos 4 (37/64)
+Consumidor 0: Retirou 36 da pos 5 (30/64)
+Produtor 0: Inseriu 57 na pos 5 (38/64)
+Consumidor 1: Retirou 30 da pos 6 (31/64)
+Produtor 0: Inseriu 12 na pos 6 (39/64)
+Consumidor 0: Retirou 3 da pos 7 (32/64)
+Produtor 1: Inseriu 43 na pos 7 (40/64)
+Consumidor 1: Retirou 23 da pos 0 (33/64)
+Produtor 0: Inseriu 30 na pos 0 (41/64)
+Consumidor 0: Retirou 59 da pos 1 (34/64)
+Produtor 1: Inseriu 74 na pos 1 (42/64)
+Consumidor 1: Retirou 70 da pos 2 (35/64)
+Produtor 1: Inseriu 22 na pos 2 (43/64)
+Consumidor 0: Retirou 68 da pos 3 (36/64)
+Produtor 0: Inseriu 20 na pos 3 (44/64)
+Consumidor 1: Retirou 94 da pos 4 (37/64)
+Produtor 1: Inseriu 85 na pos 4 (45/64)
+Consumidor 0: Retirou 57 da pos 5 (38/64)
+Produtor 0: Inseriu 38 na pos 5 (46/64)
+Consumidor 1: Retirou 12 da pos 6 (39/64)
+Produtor 0: Inseriu 99 na pos 6 (47/64)
+Consumidor 0: Retirou 43 da pos 7 (40/64)
+Produtor 1: Inseriu 25 na pos 7 (48/64)
+Consumidor 1: Retirou 30 da pos 0 (41/64)
+Produtor 0: Inseriu 16 na pos 0 (49/64)
+Consumidor 0: Retirou 74 da pos 1 (42/64)
+Produtor 1: Inseriu 71 na pos 1 (50/64)
+Consumidor 0: Retirou 22 da pos 2 (43/64)
+Produtor 0: Inseriu 14 na pos 2 (51/64)
+Consumidor 1: Retirou 20 da pos 3 (44/64)
+Produtor 1: Inseriu 27 na pos 3 (52/64)
+Consumidor 0: Retirou 85 da pos 4 (45/64)
+Produtor 1: Inseriu 92 na pos 4 (53/64)
+Consumidor 1: Retirou 38 da pos 5 (46/64)
+Produtor 0: Inseriu 81 na pos 5 (54/64)
+Consumidor 0: Retirou 99 da pos 6 (47/64)
+Produtor 1: Inseriu 57 na pos 6 (55/64)
+Consumidor 1: Retirou 25 da pos 7 (48/64)
+Produtor 0: Inseriu 74 na pos 7 (56/64)
+Consumidor 0: Retirou 16 da pos 0 (49/64)
+Produtor 1: Inseriu 63 na pos 0 (57/64)
+Consumidor 1: Retirou 71 da pos 1 (50/64)
+Produtor 0: Inseriu 71 na pos 1 (58/64)
+Consumidor 0: Retirou 14 da pos 2 (51/64)
+Produtor 0: Inseriu 97 na pos 2 (59/64)
+Consumidor 1: Retirou 27 da pos 3 (52/64)
+Produtor 1: Inseriu 82 na pos 3 (60/64)
+Consumidor 0: Retirou 92 da pos 4 (53/64)
+Produtor 1: Inseriu 6 na pos 4 (61/64)
+Consumidor 1: Retirou 81 da pos 5 (54/64)
+Produtor 0: Inseriu 26 na pos 5 (62/64)
+Consumidor 0: Retirou 57 da pos 6 (55/64)
+Produtor 1: Inseriu 85 na pos 6 (63/64)
+Consumidor 1: Retirou 74 da pos 7 (56/64)
+Produtor 0: Inseriu 28 na pos 7 (64/64)
+Consumidor 0: Retirou 63 da pos 0 (57/64)
+Consumidor 1: Retirou 71 da pos 1 (58/64)
+Consumidor 0: Retirou 97 da pos 2 (59/64)
+Consumidor 1: Retirou 82 da pos 3 (60/64)
+Consumidor 0: Retirou 6 da pos 4 (61/64)
+Consumidor 1: Retirou 26 da pos 5 (62/64)
+Consumidor 1: Retirou 85 da pos 6 (63/64)
+Consumidor 0: Retirou 28 da pos 7 (64/64)
+
+Entendimento:------------------------------------------
+
+Entendi agora que tem mais de 1 produtor e consumidor, o pthread_cond_broadcast é fica melhor que o signal porque acorda todas as threads de uma vez, evitando que o sistema trave se a thread errada despertar. Assim todos são avisados quando a fila ta liberada. Além disso entendi que com várias threads, o uso do broadcast também evita que threads fiquem presas esperando sinais perdidos. Assim nenhuma thread fica dormindo após o término dos 64 elementos.
