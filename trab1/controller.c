@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <time.h> // Necessário para srand() e time()
 
 int main() {
     printf("InterControllerSim iniciado.\n");
@@ -19,21 +20,29 @@ int main() {
     fclose(arquivo_pid);
 
     printf("=> KernelSim encontrado! (PID: %d)\n", kernel_pid);
-    printf("Enviando Timer (IRQ0) e ocasionalmente I/O (IRQ1)...\n\n");
+    printf("Iniciando geracao de IRQs a cada 500ms (Randômico para I/O)...\n\n");
 
-    int ciclos = 0;
+    // Inicializa a semente randômica usando o relógio do sistema
+    srand(time(NULL));
 
     while (1) {
-        sleep(2); 
-        printf("[CONTROLLER] Disparando IRQ0 (Timer) para PID %d\n", kernel_pid);
+        // Pausa por 500 milissegundos (500.000 microssegundos)
+        usleep(500000); 
+        
+        // 1. IRQ0: Timer (Ocorre SEMPRE a cada 500ms)
         kill(kernel_pid, SIGALRM);
+        // printf("[CONTROLLER] Disparando IRQ0 (Timer) para PID %d\n", kernel_pid); // Descomente se quiser ver cada batimento
         
-        ciclos++;
-        
-        // A cada 5 ciclos (10 segundos), simula que o Dispositivo D1 terminou
-        if (ciclos % 5 == 0) {
-            printf("\n[CONTROLLER] *** Disparando IRQ1 (Dispositivo D1 terminou!) ***\n\n");
-            kill(kernel_pid, SIGUSR2); // SIGUSR2 será o nosso IRQ1
+        // 2. IRQ1: Dispositivo D1 terminou (10% de probabilidade)
+        if ((rand() % 100) < 10) {
+            printf("\n[CONTROLLER] *** Disparando IRQ1 (Dispositivo D1 terminou!) ***\n");
+            kill(kernel_pid, SIGUSR2); 
+        }
+
+        // 3. IRQ2: Dispositivo D2 terminou (5% de probabilidade)
+        if ((rand() % 100) < 5) {
+            printf("\n[CONTROLLER] *** Disparando IRQ2 (Dispositivo D2 terminou!) ***\n");
+            kill(kernel_pid, SIGURG); // Usaremos SIGURG para representar o IRQ2
         }
     }
 
