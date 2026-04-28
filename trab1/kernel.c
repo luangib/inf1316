@@ -9,7 +9,7 @@
 #define PRONTO 0
 #define BLOQUEADO 1
 
-// --- ESTRUTURA DE CONTROLO DE PROCESSO (PCB) ---
+//Estrutura do PCB
 typedef struct {
     pid_t pid;
     char nome[3];
@@ -26,7 +26,7 @@ PCB tabela[NUM_APPS];
 int processo_atual = 0;
 int fd_leitura;
 
-// --- FILAS DE DISPOSITIVOS (FIFO) ---
+// Filas de Sispositivo FIFO
 int fila_d1[NUM_APPS], frente_d1 = 0, tras_d1 = 0;
 int fila_d2[NUM_APPS], frente_d2 = 0, tras_d2 = 0;
 
@@ -36,9 +36,9 @@ int desenfileirar(int *fila, int *frente, int *tras) {
     return fila[(*frente)++];
 }
 
-// --- TRATADOR DE INTERRUPÇÕES ---
+//Tratador de Interrupções
 void trata_interrupcao(int sig) {
-    if (sig == SIGALRM) { // IRQ0: Timer
+    if (sig == SIGALRM) { 
         printf("\n[KERNEL] => IRQ0 (Timer). Escalonamento Round-Robin.\n");
         
         if (tabela[processo_atual].estado == PRONTO) {
@@ -52,12 +52,11 @@ void trata_interrupcao(int sig) {
         kill(tabela[processo_atual].pid, SIGCONT);
         printf("[KERNEL] CPU atribuida a %s (PID: %d)\n", tabela[processo_atual].nome, tabela[processo_atual].pid);
     } 
-    else if (sig == SIGUSR1) { // SYSCALL: Pedido de I/O
+    else if (sig == SIGUSR1) { 
         char buffer[100];
         read(fd_leitura, buffer, sizeof(buffer));
         
         int idx = processo_atual;
-        // Parsing do contexto: "A3 D2 W m05 1042"
         sscanf(buffer, "%*s %s %c %s %d", tabela[idx].disp_bloqueio, &tabela[idx].op_bloqueio, tabela[idx].mem_atual, &tabela[idx].pc);
         
         tabela[idx].estado = BLOQUEADO;
@@ -72,11 +71,10 @@ void trata_interrupcao(int sig) {
             tabela[idx].acessos_d2++;
         }
 
-        // Escolhe o próximo pronto
         do { processo_atual = (processo_atual + 1) % NUM_APPS; } while (tabela[processo_atual].estado == BLOQUEADO);
         kill(tabela[processo_atual].pid, SIGCONT);
     }
-    else if (sig == SIGUSR2 || sig == SIGURG) { // IRQ1 (D1) ou IRQ2 (D2)
+    else if (sig == SIGUSR2 || sig == SIGURG) {
         int idx_liberado;
         if (sig == SIGUSR2) {
             printf("\n[HARDWARE] =====> IRQ1: D1 Concluido <=====\n");
@@ -91,7 +89,7 @@ void trata_interrupcao(int sig) {
             printf("[KERNEL] Processo %s agora esta PRONTO!\n", tabela[idx_liberado].nome);
         }
     }
-    else if (sig == SIGTSTP) { // RELATÓRIO (Ctrl+Z)
+    else if (sig == SIGTSTP) {
         printf("\n\n==================== RELATORIO DO SISTEMA ====================\n");
         for (int i = 0; i < NUM_APPS; i++) {
             printf("APP: %s | PID: %d | PC: %d | Mem: %s\n", tabela[i].nome, tabela[i].pid, tabela[i].pc, tabela[i].mem_atual);
