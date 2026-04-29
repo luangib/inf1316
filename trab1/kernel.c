@@ -9,15 +9,15 @@
 #define PRONTO 0
 #define BLOQUEADO 1
 
-//Estrutura do PCB
+// Estrutura do PCB
 typedef struct {
     pid_t pid;
     char nome[3];
     int estado;
     int pc;
     char mem_atual[5];
-    char disp_bloqueio[3]; // D1 ou D2
-    char op_bloqueio;      // R, W ou X
+    char disp_bloqueio[3]; 
+    char op_bloqueio;      
     int acessos_d1;
     int acessos_d2;
 } PCB;
@@ -26,7 +26,7 @@ PCB tabela[NUM_APPS];
 int processo_atual = 0;
 int fd_leitura;
 
-// Filas de Sispositivo FIFO
+// Filas de Dispositivo FIFO
 int fila_d1[NUM_APPS], frente_d1 = 0, tras_d1 = 0;
 int fila_d2[NUM_APPS], frente_d2 = 0, tras_d2 = 0;
 
@@ -36,7 +36,7 @@ int desenfileirar(int *fila, int *frente, int *tras) {
     return fila[(*frente)++];
 }
 
-//Tratador de Interrupções
+// Tratador de Interrupções
 void trata_interrupcao(int sig) {
     if (sig == SIGALRM) { 
         printf("\n[KERNEL] => IRQ0 (Timer). Escalonamento Round-Robin.\n");
@@ -45,12 +45,21 @@ void trata_interrupcao(int sig) {
             kill(tabela[processo_atual].pid, SIGSTOP);
         }
 
-        do {
-            processo_atual = (processo_atual + 1) % NUM_APPS;
-        } while (tabela[processo_atual].estado == BLOQUEADO);
+        int todos_bloqueados = 1;
+        for(int i = 0; i < NUM_APPS; i++) {
+            if(tabela[i].estado == PRONTO) { todos_bloqueados = 0; break; }
+        }
 
-        kill(tabela[processo_atual].pid, SIGCONT);
-        printf("[KERNEL] CPU atribuida a %s (PID: %d)\n", tabela[processo_atual].nome, tabela[processo_atual].pid);
+        if (todos_bloqueados) {
+            printf("[KERNEL] CPU Ociosa. Todos os processos estao bloqueados aguardando hardware...\n");
+        } else {
+            do {
+                processo_atual = (processo_atual + 1) % NUM_APPS;
+            } while (tabela[processo_atual].estado == BLOQUEADO);
+
+            kill(tabela[processo_atual].pid, SIGCONT);
+            printf("[KERNEL] CPU atribuida a %s (PID: %d)\n", tabela[processo_atual].nome, tabela[processo_atual].pid);
+        }
     } 
     else if (sig == SIGUSR1) { 
         char buffer[100];
@@ -71,10 +80,19 @@ void trata_interrupcao(int sig) {
             tabela[idx].acessos_d2++;
         }
 
-        do { processo_atual = (processo_atual + 1) % NUM_APPS; } while (tabela[processo_atual].estado == BLOQUEADO);
-        kill(tabela[processo_atual].pid, SIGCONT);
+        int todos_bloqueados = 1;
+        for(int i = 0; i < NUM_APPS; i++) {
+            if(tabela[i].estado == PRONTO) { todos_bloqueados = 0; break; }
+        }
+
+        if (todos_bloqueados) {
+            printf("[KERNEL] CPU Ociosa. O ultimo processo ativo acaba de bloquear...\n");
+        } else {
+            do { processo_atual = (processo_atual + 1) % NUM_APPS; } while (tabela[processo_atual].estado == BLOQUEADO);
+            kill(tabela[processo_atual].pid, SIGCONT);
+        }
     }
-    else if (sig == SIGUSR2 || sig == SIGURG) {
+    else if (sig == SIGUSR2 || sig == SIGURG) { 
         int idx_liberado;
         if (sig == SIGUSR2) {
             printf("\n[HARDWARE] =====> IRQ1: D1 Concluido <=====\n");
@@ -89,14 +107,14 @@ void trata_interrupcao(int sig) {
             printf("[KERNEL] Processo %s agora esta PRONTO!\n", tabela[idx_liberado].nome);
         }
     }
-    else if (sig == SIGTSTP) {
+    else if (sig == SIGTSTP) { 
         printf("\n\n==================== RELATORIO DO SISTEMA ====================\n");
         for (int i = 0; i < NUM_APPS; i++) {
             printf("APP: %s | PID: %d | PC: %d | Mem: %s\n", tabela[i].nome, tabela[i].pid, tabela[i].pc, tabela[i].mem_atual);
             if (tabela[i].estado == BLOQUEADO)
                 printf("  -> Estado: BLOQUEADO (%s - Op: %c)\n", tabela[i].disp_bloqueio, tabela[i].op_bloqueio);
             else
-                printf("  -> Estado: %s\n", (processo_atual == i) ? "EXECUTANDO" : "PRONTO");
+                printf("  -> Estado: %s\n", (processo_atual == i && tabela[i].estado != BLOQUEADO) ? "EXECUTANDO" : "PRONTO");
             printf("  -> Total Acessos: D1: %d | D2: %d\n", tabela[i].acessos_d1, tabela[i].acessos_d2);
             printf("--------------------------------------------------------------\n");
         }
@@ -115,9 +133,12 @@ int main() {
     fprintf(f, "%d", getpid());
     fclose(f);
 
-    signal(SIGALRM, trata_interrupcao); signal(SIGUSR1, trata_interrupcao);
-    signal(SIGUSR2, trata_interrupcao); signal(SIGURG, trata_interrupcao);
-    signal(SIGTSTP, trata_interrupcao); signal(SIGCONT, trata_interrupcao);
+    signal(SIGALRM, trata_interrupcao); 
+    signal(SIGUSR1, trata_interrupcao);
+    signal(SIGUSR2, trata_interrupcao); 
+    signal(SIGURG, trata_interrupcao);
+    signal(SIGTSTP, trata_interrupcao); 
+    signal(SIGCONT, trata_interrupcao);
 
     int pipe_fd[2]; pipe(pipe_fd);
     fd_leitura = pipe_fd[0];
