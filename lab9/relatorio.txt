@@ -1,0 +1,396 @@
+1) ---------------------------------------------
+
+Código ---------------------------------------------
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+void *memorypool;
+
+void initmemorypool(void) { 
+    memorypool = sbrk(0); 
+}
+
+void *myallocate(int n) {
+    return sbrk(n);
+}
+
+void resetmemorypool(void){
+    brk(memorypool);
+}
+
+int main(void) {
+    initmemorypool();
+    printf("Limite original do heap: %p\n", sbrk(0));
+
+    int *array = (int *)myallocate(100 * sizeof(int));
+    printf("Limite após alocar: %p\n", sbrk(0));
+
+    array[0] = 42;
+    array[99] = 84;
+    printf("array[0] = %d, array[99] = %d\n", array[0], array[99]);
+
+    resetmemorypool();
+    printf("Limite após desalocar: %p\n", sbrk(0));
+
+    return 0;
+}
+
+Saída ---------------------------------------------
+
+Limite original do heap: 0x5df7ae3ae000
+Limite após alocar: 0x5df7ae3cf190
+array[0] = 42, array[99] = 84
+Segmentation fault (core dumped)
+
+Entendimento ---------------------------------------------
+
+O erro de segmentação acontece pois nossa manipulação manual do topo do heap entrou em conflito com o gerenciamento de memória do sistema. Funções padrão costumam alocar espaço internamente e a redução abrupta do limite causou uma corrupção grave no processo.
+
+2) ---------------------------------------------
+
+Código ---------------------------------------------
+
+#include <stdio.h>       
+#include <sys/types.h>   
+#include <sys/stat.h>    
+#include <fcntl.h>       
+#include <unistd.h>      
+#include <sys/mman.h>    
+#include <stdlib.h>      
+
+int main (int argc, char *argv[]) 
+{ 
+    struct stat sb;      
+    int fd;              
+    off_t len;           
+    char *p;             
+
+    if (argc < 2) { 
+        fprintf (stderr, "usage: %s <file>\n", argv[0]); 
+        exit(1);                                         
+    } 
+
+    fd = open (argv[1], O_RDONLY);                       
+    if (fd == -1) { perror ("open"); exit(1); }          
+
+    if (fstat(fd, &sb) == -1) { perror ("fstat"); exit(1); } 
+
+    if (!S_ISREG (sb.st_mode)) { 
+        fprintf (stderr, "%s is not a file\n", argv[1]); 
+        exit(1);                                         
+    }
+
+    p = mmap (0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0); 
+    if (p == MAP_FAILED) { perror ("mmap"); exit(1); }      
+
+    if (close (fd) == -1) { perror ("close"); exit(1); }    
+
+    for (len = 0; len < sb.st_size; len++) putchar (p[len]); 
+
+    if (munmap (p, sb.st_size) == -1) { perror ("munmap"); exit(1); } 
+    
+    return 0; 
+} 
+
+Saída ---------------------------------------------
+
+./map-exemplo map-exemplo.c
+#include <stdio.h>       
+#include <sys/types.h>   
+#include <sys/stat.h>    
+#include <fcntl.h>       
+#include <unistd.h>      
+#include <sys/mman.h>    
+#include <stdlib.h>      
+
+int main (int argc, char *argv[]) 
+{ 
+    struct stat sb;      
+    int fd;              
+    off_t len;           
+    char *p;             
+
+Entendimento ---------------------------------------------
+
+O programa conseguiu ler e imprimir o próprio código projetando o arquivo na memória RAM de forma direta. Isso elimina a necessidade de chamadas de leitura no disco e trata o texto inteiro como um simples vetor.
+
+3) ---------------------------------------------
+
+Código ---------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/time.h>
+#include <string.h>
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s <file>\n", argv[0]);
+        exit(1);
+    }
+
+    struct stat sb;
+    int fd = open(argv[1], O_RDWR);
+    if (fd == -1) { perror("open"); exit(1); }
+    if (fstat(fd, &sb) == -1) { perror("fstat"); exit(1); }
+
+    long pagesize = sysconf(_SC_PAGESIZE); 
+    long num_pages = (sb.st_size + pagesize - 1) / pagesize; 
+    
+    printf("--- INFORMACOES DE MEMORIA ---\n");
+    printf("Tamanho do arquivo: %lld bytes\n", (long long)sb.st_size);
+    printf("Tamanho da página do sistema: %ld bytes\n", pagesize);
+    printf("Total de páginas alocadas: %ld\n\n", num_pages);
+
+    struct timeval start, end;
+    long msec_mmap, msec_write;
+
+    printf("--- TESTE DE PERFORMANCE ---\n");
+
+    char *p = mmap(0, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) { perror("mmap"); exit(1); }
+
+    gettimeofday(&start, NULL); 
+    for (off_t i = 0; i < sb.st_size; i++) {
+        p[i] = 'A'; 
+    }
+    msync(p, sb.st_size, MS_SYNC); 
+    gettimeofday(&end, NULL);   
+    
+    msec_mmap = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+
+    lseek(fd, 0, SEEK_SET); 
+    char *buffer = malloc(sb.st_size);
+    memset(buffer, 'B', sb.st_size); 
+
+    gettimeofday(&start, NULL); 
+    write(fd, buffer, sb.st_size); 
+    fsync(fd); 
+    gettimeofday(&end, NULL);   
+
+    msec_write = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+
+    printf("Tempo de escrita via mmap(): %ld microsegundos\n", msec_mmap);
+    printf("Tempo de escrita via write(): %ld microsegundos\n", msec_write);
+
+    free(buffer);
+    munmap(p, sb.st_size);
+    close(fd);
+
+    return 0;
+}
+
+Saída ---------------------------------------------
+
+./ex3 arquivo_grande.txt
+--- INFORMACOES DE MEMORIA ---
+Tamanho do arquivo: 52428800 bytes
+Tamanho da página do sistema: 4096 bytes
+Total de páginas alocadas: 12800
+
+--- TESTE DE PERFORMANCE ---
+Tempo de escrita via mmap(): 697307 microsegundos
+Tempo de escrita via write(): 550398 microsegundos
+
+Entendimento ---------------------------------------------
+
+A gravação tradicional foi levemente mais rápida que o mapeamento de memória nesse teste específico. Isso ocorre pois o mapeamento sofre um pequeno atraso inicial ao precisar alocar e mapear as páginas virtuais do sistema pela primeira vez.
+
+4)  ---------------------------------------------
+
+Código prog1.c ---------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <string.h>
+
+int main() {
+    const char *filepath = "memoria_compartilhada.bin";
+    size_t tamanho = 4096; 
+
+    int fd = open(filepath, O_RDWR | O_CREAT, 0666);
+    if (fd == -1) { perror("open prog1"); exit(1); }
+
+    ftruncate(fd, tamanho);
+
+    char *p = mmap(0, tamanho, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) { perror("mmap prog1"); exit(1); }
+
+    printf("[Prog1] Escrevendo mensagem na memória...\n");
+    strcpy(p, "Salve do Prog1! Essa mensagem não passou por pipes nem sockets.");
+
+    printf("[Prog1] Mensagem escrita. Deixando em aberto por 15 segundos...\n");
+    sleep(15); 
+
+    munmap(p, tamanho);
+    close(fd);
+    printf("[Prog1] Encerrado.\n");
+    
+    return 0;
+}
+
+Código prog2.c ---------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
+int main() {
+    const char *filepath = "memoria_compartilhada.bin";
+    size_t tamanho = 4096;
+
+    int fd = open(filepath, O_RDONLY);
+    if (fd == -1) { 
+        perror("open prog2 (Rode o prog1 primeiro!)"); 
+        exit(1); 
+    }
+
+    char *p = mmap(0, tamanho, PROT_READ, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) { perror("mmap prog2"); exit(1); }
+
+    printf("[Prog2] Lendo a memória compartilhada:\n");
+    printf("--> \"%s\"\n", p);
+
+    munmap(p, tamanho);
+    close(fd);
+    
+    return 0;
+}
+
+Saída ---------------------------------------------
+
+$ ./prog1 &
+[1] 8460
+[Prog1] Escrevendo mensagem na memória...
+[Prog1] Mensagem escrita. Deixando em aberto por 15 segundos...
+$ ./prog2
+[Prog2] Lendo a memória compartilhada:
+--> "Salve do Prog1! Essa mensagem não passou por pipes nem sockets."
+$ [Prog1] Encerrado.
+
+Entendimento ---------------------------------------------
+
+O segundo programa conseguiu ler a mensagem escrita pelo primeiro de forma quase instantânea. O mapeamento compartilhado fez com que os dois processos enxergassem a mesma região da memória física e trocassem dados de forma muito eficiente.
+
+5)  ---------------------------------------------
+
+Código ---------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <string.h>
+
+int main() {
+    const char *filepath = "texto_ex5.txt";
+    
+    int fd = open(filepath, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (fd == -1) { perror("open"); exit(1); }
+
+    size_t tamanho_antigo = 15;
+    ftruncate(fd, tamanho_antigo); 
+    
+    char *p = mmap(0, tamanho_antigo, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) { perror("mmap"); exit(1); }
+
+    strcpy(p, "Texto base. "); 
+    printf("Conteúdo inicial na RAM: %s\n", p);
+
+    size_t tamanho_novo = 45;
+    ftruncate(fd, tamanho_novo);
+
+    munmap(p, tamanho_antigo);
+
+    p = mmap(0, tamanho_novo, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) { perror("mmap novo"); exit(1); }
+    
+    strcat(p, "Adicionando novos caracteres!"); 
+    printf("Conteúdo após expansão: %s\n", p);
+
+    munmap(p, tamanho_novo);
+    close(fd);
+    
+    return 0;
+}
+
+Saída ---------------------------------------------
+
+$ gcc -o ex5 ex5.c
+$ ./ex5
+Conteúdo inicial na RAM: Texto base. 
+Conteúdo após expansão: Texto base. Adicionando novos caracteres!
+$ cat texto_ex5.txt
+Texto base. Adicionando novos caracteres!
+
+Entendimento ---------------------------------------------
+
+O arquivo precisou ser expandido fisicamente no disco antes de receber os novos caracteres no seu final. Essa etapa de aumentar o limite previne falhas de segmentação ao garantir que a memória virtual tenha o espaço correspondente mapeado e alocado.
+
+6) ---------------------------------------------
+
+Código ---------------------------------------------
+
+#define _GNU_SOURCE 
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <string.h>
+
+int main() {
+    const char *filepath = "texto_ex6.txt";
+    
+    int fd = open(filepath, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (fd == -1) { perror("open"); exit(1); }
+
+    size_t old_sz = 15;
+    ftruncate(fd, old_sz); 
+    
+    char *p = mmap(NULL, old_sz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) { perror("mmap"); exit(1); }
+
+    strcpy(p, "Texto base 6. ");
+    printf("Conteúdo inicial na RAM: %s\n", p);
+
+    size_t new_sz = 55;
+    ftruncate(fd, new_sz);
+
+    p = mremap(p, old_sz, new_sz, MREMAP_MAYMOVE); 
+    if (p == MAP_FAILED) { perror("mremap"); exit(1); }
+    
+    strcat(p, "Usando mremap para expandir a memoria!");
+    printf("Conteúdo após mremap: %s\n", p);
+
+    munmap(p, new_sz);
+    close(fd);
+    
+    return 0;
+}
+
+Saída ---------------------------------------------
+
+$ gcc -o ex6 ex6.c
+$ ./ex6
+Conteúdo inicial na RAM: Texto base 6. 
+Conteúdo após mremap: Texto base 6. Usando mremap para expandir a memoria!
+$ cat texto_ex6.txt
+Texto base 6. Usando mremap para expandir a memoria!
+
+Entendimento ---------------------------------------------
+
+O uso da função nativa otimizou o processo de expansão da memória virtual sem precisar refazer o mapeamento todo do zero. O arquivo físico foi ampliado e o núcleo do sistema apenas ajustou os endereços virtuais para comportar o novo texto.
