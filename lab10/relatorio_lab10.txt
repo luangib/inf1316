@@ -35,7 +35,6 @@ void gerar_operacoes(int n) {
         } else {
 
             int value = (rand() % 4991) + 10;
-            // Formato pedido: W, value, key [cite: 258, 259]
             printf("W, %d, %d\n", value, key);
         }
     }
