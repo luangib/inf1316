@@ -1,0 +1,462 @@
+Atividade: Lab 10 - INF1316 (de 2026.1)
+Nome: Luan Francisco Gibson Coutinho
+Matricula: 2411167
+
+
+
++--------------------------------------------------+
+1)
+Codigo:------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define MAX_KEY 999
+#define MIN_KEY 0
+
+typedef enum {
+    READ, WRITE
+} OpType;
+
+
+void gerar_operacoes(int n) {
+
+    srand(time(NULL));
+    
+    for (int i = 0; i < n; i++) {
+
+        OpType op = rand() % 2;
+        
+        int key = (rand() % (MAX_KEY - MIN_KEY + 1)) + MIN_KEY;
+        
+        if (op == READ) {
+            printf("R, %d\n", key);
+        } else {
+
+            int value = (rand() % 4991) + 10;
+            // Formato pedido: W, value, key [cite: 258, 259]
+            printf("W, %d, %d\n", value, key);
+        }
+    }
+}
+
+int main() {
+
+    if (freopen("log.txt", "w", stdout) == NULL) {
+        fprintf(stderr, "Erro ao abrir (ou criar) o arquivo log.txt\n");
+        return 1;
+    }
+
+    gerar_operacoes(10000);
+
+    return 0;
+}
+
+
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab10 (main) $ gcc log_gen.c -o log_gen
+@luangib ➜ /workspaces/inf1316/lab10 (main) $ ./log_gen
+
+
+Entendimento:------------------------------------------
+Fiz relamente só o codigo gerar o log que tinha sido pedido.
++--------------------------------------------------+
+
+
+2)
+Codigo:------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+#include <signal.h>
+#include <string.h>
+
+#define DB_SIZE 1000
+#define CACHE_SIZE 100
+
+#define DB_SUCCESS 1
+#define DB_ERROR 0
+
+// --- Estruturas e Variáveis Globais ---
+
+typedef struct {
+    int key;
+    int value;
+    time_t timestamp;
+} CacheEntry;
+
+CacheEntry cache[CACHE_SIZE];
+int is_valid[CACHE_SIZE] = {0};
+int banco_de_dados[DB_SIZE];
+
+// --- Tratamento de Sinal (Ctrl-Z) ---
+
+void handle_sigtstp(int sig) {
+    printf("\n\n>>> [SINAL] Ctrl-Z capturado! Limpando todo o cache... <<<\n\n");
+    for (int i = 0; i < CACHE_SIZE; i++) {
+        is_valid[i] = 0;
+    }
+}
+
+// --- Funções Simuladas do Banco de Dados ---
+
+int db_read(int key, int* out_value) {
+    if (key < 0 || key >= DB_SIZE) return DB_ERROR;
+    *out_value = banco_de_dados[key];
+    return DB_SUCCESS;
+}
+
+int db_write(int key, int new_value) {
+    if (key < 0 || key >= DB_SIZE) return DB_ERROR;
+    banco_de_dados[key] = new_value;
+    return DB_SUCCESS;
+}
+
+
+
+int main() {
+    for (int i = 0; i < DB_SIZE; i++) {
+        banco_de_dados[i] = i + 1;
+    }
+
+
+    signal(SIGTSTP, handle_sigtstp);
+
+
+    FILE *fp = fopen("log.txt", "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Erro ao abrir log.txt. Execute log_gen primeiro.\n");
+        return 1;
+    }
+
+    printf("Iniciando processamento (Cache-Aside). Pressione Ctrl-Z para limpar o cache.\n\n");
+
+    char line[128];
+    int key, value, val_out;
+
+
+    while (1) {
+        
+        if (fgets(line, sizeof(line), fp) == NULL) {
+            rewind(fp);
+            continue;
+        }
+
+       
+
+        if (line[0] == 'R') {
+            sscanf(line, "R, %d", &key);
+            int idx = key % CACHE_SIZE; 
+
+           
+            if (is_valid[idx] && cache[idx].key == key) {
+                printf("[READ] Key %3d -> CACHE HIT!  (Valor: %d)\n", key, cache[idx].value);
+                cache[idx].timestamp = time(NULL); 
+            } else {
+                printf("[READ] Key %3d -> CACHE MISS! Buscando no DB...\n", key);
+                db_read(key, &val_out);
+                
+                
+                cache[idx].key = key;
+                cache[idx].value = val_out;
+                cache[idx].timestamp = time(NULL);
+                is_valid[idx] = 1;
+            }
+
+        } else if (line[0] == 'W') {
+            sscanf(line, "W, %d, %d", &value, &key);
+            int idx = key % CACHE_SIZE;
+
+            printf("[WRITE] Key %3d -> Gravando direto no DB (Novo valor: %d)\n", key, value);
+            db_write(key, value);
+
+           
+            if (is_valid[idx] && cache[idx].key == key) {
+                is_valid[idx] = 0;
+                printf("        -> Entrada invalidada no cache para manter consistência.\n");
+            }
+        }
+
+       
+        usleep(300000); 
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab10 (main) $ gcc main.c -o main
+@luangib ➜ /workspaces/inf1316/lab10 (main) $ ./main
+Iniciando processamento (Cache-Aside). Pressione Ctrl-Z para limpar o cache.
+
+[READ] Key 220 -> CACHE MISS! Buscando no DB...
+[READ] Key  38 -> CACHE MISS! Buscando no DB...
+[READ] Key 760 -> CACHE MISS! Buscando no DB...
+[READ] Key 234 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 568 -> Gravando direto no DB (Novo valor: 2780)
+[WRITE] Key 469 -> Gravando direto no DB (Novo valor: 3194)
+[WRITE] Key 826 -> Gravando direto no DB (Novo valor: 4466)
+[READ] Key 100 -> CACHE MISS! Buscando no DB...
+[READ] Key 284 -> CACHE MISS! Buscando no DB...
+[WRITE] Key  24 -> Gravando direto no DB (Novo valor: 1803)
+[WRITE] Key 978 -> Gravando direto no DB (Novo valor: 4731)
+[READ] Key 460 -> CACHE MISS! Buscando no DB...
+[WRITE] Key  99 -> Gravando direto no DB (Novo valor: 1725)
+[WRITE] Key 985 -> Gravando direto no DB (Novo valor: 3211)
+[READ] Key 745 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 532 -> Gravando direto no DB (Novo valor: 1451)
+[WRITE] Key 664 -> Gravando direto no DB (Novo valor: 788)
+[READ] Key 157 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 548 -> Gravando direto no DB (Novo valor: 3879)
+[READ] Key   0 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 570 -> Gravando direto no DB (Novo valor: 4841)
+[WRITE] Key 585 -> Gravando direto no DB (Novo valor: 366)
+[WRITE] Key  41 -> Gravando direto no DB (Novo valor: 3482)
+[WRITE] Key 122 -> Gravando direto no DB (Novo valor: 2686)
+[READ] Key 423 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 370 -> Gravando direto no DB (Novo valor: 1742)
+[READ] Key 703 -> CACHE MISS! Buscando no DB...
+[READ] Key 299 -> CACHE MISS! Buscando no DB...
+[READ] Key 918 -> CACHE MISS! Buscando no DB...
+^Z
+
+>>> [SINAL] Ctrl-Z capturado! Limpando todo o cache... <<<
+
+[WRITE] Key 326 -> Gravando direto no DB (Novo valor: 2998)
+[READ] Key 875 -> CACHE MISS! Buscando no DB...
+[READ] Key 948 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 867 -> Gravando direto no DB (Novo valor: 2140)
+[WRITE] Key 912 -> Gravando direto no DB (Novo valor: 3390)
+[WRITE] Key 936 -> Gravando direto no DB (Novo valor: 3284)
+[READ] Key 771 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 247 -> Gravando direto no DB (Novo valor: 3953)
+[WRITE] Key 786 -> Gravando direto no DB (Novo valor: 2662)
+[READ] Key 775 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 722 -> Gravando direto no DB (Novo valor: 1266)
+[READ] Key 993 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 712 -> Gravando direto no DB (Novo valor: 4315)
+[WRITE] Key 587 -> Gravando direto no DB (Novo valor: 104)
+[READ] Key 463 -> CACHE MISS! Buscando no DB...
+[READ] Key 773 -> CACHE MISS! Buscando no DB...
+[READ] Key 103 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 783 -> Gravando direto no DB (Novo valor: 3651)
+[WRITE] Key 476 -> Gravando direto no DB (Novo valor: 1018)
+[READ] Key  75 -> CACHE MISS! Buscando no DB...
+[READ] Key 501 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 596 -> Gravando direto no DB (Novo valor: 2562)
+[READ] Key 377 -> CACHE MISS! Buscando no DB...
+^Z
+
+>>> [SINAL] Ctrl-Z capturado! Limpando todo o cache... <<<
+
+[READ] Key  62 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 389 -> Gravando direto no DB (Novo valor: 634)
+[READ] Key 810 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 767 -> Gravando direto no DB (Novo valor: 1029)
+[WRITE] Key 582 -> Gravando direto no DB (Novo valor: 2343)
+[READ] Key 777 -> CACHE MISS! Buscando no DB...
+[READ] Key 267 -> CACHE MISS! Buscando no DB...
+[READ] Key 113 -> CACHE MISS! Buscando no DB...
+[READ] Key 388 -> CACHE MISS! Buscando no DB...
+[READ] Key 805 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 794 -> Gravando direto no DB (Novo valor: 3742)
+[WRITE] Key 390 -> Gravando direto no DB (Novo valor: 216)
+[WRITE] Key 119 -> Gravando direto no DB (Novo valor: 1597)
+[READ] Key 235 -> CACHE MISS! Buscando no DB...
+
+
+
+Entendimento:------------------------------------------
+
+Eu fiz o código para simular uma memória rápida e entendi bem como ela se comporta. Como as buscas eram muito aleatórias o programa quase nunca achava as informações de primeira e precisava consultar tudo direto no banco principal. Na hora de salvar dados novos eu fiz o sistema gravar logo na base segura para não perder nada. Também testei o atalho do teclado e vi que ele limpou a memória certinho sem parar a execução do programa.
+
++--------------------------------------------------+
+
+
+3)
+Codigo:------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+#include <signal.h>
+#include <string.h>
+
+#define DB_SIZE 1000
+#define CACHE_SIZE 100
+
+#define DB_SUCCESS 1
+#define DB_ERROR 0
+
+typedef struct {
+    int key;
+    int value;
+    time_t timestamp;
+} CacheEntry;
+
+CacheEntry cache[CACHE_SIZE];
+int is_valid[CACHE_SIZE] = {0};
+int banco_de_dados[DB_SIZE];
+
+void handle_sigtstp(int sig) {
+    printf("\n\n>>> [SINAL] Ctrl-Z capturado! Limpando todo o cache... <<<\n\n");
+    for (int i = 0; i < CACHE_SIZE; i++) {
+        is_valid[i] = 0;
+    }
+}
+
+int db_read(int key, int* out_value) {
+    if (key < 0 || key >= DB_SIZE) return DB_ERROR;
+    *out_value = banco_de_dados[key];
+    return DB_SUCCESS;
+}
+
+int db_write(int key, int new_value) {
+    if (key < 0 || key >= DB_SIZE) return DB_ERROR;
+    banco_de_dados[key] = new_value;
+    return DB_SUCCESS;
+}
+
+int main() {
+    for (int i = 0; i < DB_SIZE; i++) {
+        banco_de_dados[i] = i + 1;
+    }
+
+    signal(SIGTSTP, handle_sigtstp);
+
+    FILE *fp = fopen("log.txt", "r");
+    if (fp == NULL) {
+        printf("Erro ao abrir log.txt.\n");
+        return 1;
+    }
+
+    printf("Iniciando processamento (Write-Through). Pressione Ctrl-Z para limpar o cache.\n\n");
+
+    char line[128];
+    int key, value, val_out;
+
+    while (1) {
+        if (fgets(line, sizeof(line), fp) == NULL) {
+            rewind(fp);
+            continue;
+        }
+
+        if (line[0] == 'R') {
+            sscanf(line, "R, %d", &key);
+            int idx = key % CACHE_SIZE; 
+
+            if (is_valid[idx] && cache[idx].key == key) {
+                printf("[READ] Key %3d -> CACHE HIT!  (Valor: %d)\n", key, cache[idx].value);
+                cache[idx].timestamp = time(NULL); 
+            } else {
+                printf("[READ] Key %3d -> CACHE MISS! Buscando no DB...\n", key);
+                db_read(key, &val_out);
+                
+                cache[idx].key = key;
+                cache[idx].value = val_out;
+                cache[idx].timestamp = time(NULL);
+                is_valid[idx] = 1;
+            }
+
+        } else if (line[0] == 'W') {
+            sscanf(line, "W, %d, %d", &value, &key);
+            int idx = key % CACHE_SIZE;
+
+            printf("[WRITE] Key %3d -> Gravando no DB e no CACHE simultaneamente (Novo: %d)\n", key, value);
+            
+            // 1. Grava no Banco de Dados
+            db_write(key, value);
+
+            // 2. Grava no Cache ao mesmo tempo (Write-Through)
+            cache[idx].key = key;
+            cache[idx].value = value;
+            cache[idx].timestamp = time(NULL);
+            is_valid[idx] = 1;
+        }
+
+        usleep(300000);
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+
+Prompt:------------------------------------------
+@luangib ➜ /workspaces/inf1316/lab10 (main) $ gcc main_wt.c -o main_wt
+@luangib ➜ /workspaces/inf1316/lab10 (main) $ ./main_wt
+Iniciando processamento (Write-Through). Pressione Ctrl-Z para limpar o cache.
+
+[READ] Key 220 -> CACHE MISS! Buscando no DB...
+[READ] Key  38 -> CACHE MISS! Buscando no DB...
+[READ] Key 760 -> CACHE MISS! Buscando no DB...
+[READ] Key 234 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 568 -> Gravando no DB e no CACHE simultaneamente (Novo: 2780)
+[WRITE] Key 469 -> Gravando no DB e no CACHE simultaneamente (Novo: 3194)
+[WRITE] Key 826 -> Gravando no DB e no CACHE simultaneamente (Novo: 4466)
+[READ] Key 100 -> CACHE MISS! Buscando no DB...
+[READ] Key 284 -> CACHE MISS! Buscando no DB...
+[WRITE] Key  24 -> Gravando no DB e no CACHE simultaneamente (Novo: 1803)
+[WRITE] Key 978 -> Gravando no DB e no CACHE simultaneamente (Novo: 4731)
+[READ] Key 460 -> CACHE MISS! Buscando no DB...
+[WRITE] Key  99 -> Gravando no DB e no CACHE simultaneamente (Novo: 1725)
+[WRITE] Key 985 -> Gravando no DB e no CACHE simultaneamente (Novo: 3211)
+[READ] Key 745 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 532 -> Gravando no DB e no CACHE simultaneamente (Novo: 1451)
+^Z
+
+>>> [SINAL] Ctrl-Z capturado! Limpando todo o cache... <<<
+
+[WRITE] Key 664 -> Gravando no DB e no CACHE simultaneamente (Novo: 788)
+[READ] Key 157 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 548 -> Gravando no DB e no CACHE simultaneamente (Novo: 3879)
+[READ] Key   0 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 570 -> Gravando no DB e no CACHE simultaneamente (Novo: 4841)
+[WRITE] Key 585 -> Gravando no DB e no CACHE simultaneamente (Novo: 366)
+[WRITE] Key  41 -> Gravando no DB e no CACHE simultaneamente (Novo: 3482)
+[WRITE] Key 122 -> Gravando no DB e no CACHE simultaneamente (Novo: 2686)
+[READ] Key 423 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 370 -> Gravando no DB e no CACHE simultaneamente (Novo: 1742)
+[READ] Key 703 -> CACHE MISS! Buscando no DB...
+[READ] Key 299 -> CACHE MISS! Buscando no DB...
+[READ] Key 918 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 326 -> Gravando no DB e no CACHE simultaneamente (Novo: 2998)
+[READ] Key 875 -> CACHE MISS! Buscando no DB...
+[READ] Key 948 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 867 -> Gravando no DB e no CACHE simultaneamente (Novo: 2140)
+[WRITE] Key 912 -> Gravando no DB e no CACHE simultaneamente (Novo: 3390)
+[WRITE] Key 936 -> Gravando no DB e no CACHE simultaneamente (Novo: 3284)
+[READ] Key 771 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 247 -> Gravando no DB e no CACHE simultaneamente (Novo: 3953)
+^Z
+
+>>> [SINAL] Ctrl-Z capturado! Limpando todo o cache... <<<
+
+[WRITE] Key 786 -> Gravando no DB e no CACHE simultaneamente (Novo: 2662)
+[READ] Key 775 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 722 -> Gravando no DB e no CACHE simultaneamente (Novo: 1266)
+[READ] Key 993 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 712 -> Gravando no DB e no CACHE simultaneamente (Novo: 4315)
+[WRITE] Key 587 -> Gravando no DB e no CACHE simultaneamente (Novo: 104)
+[READ] Key 463 -> CACHE MISS! Buscando no DB...
+[READ] Key 773 -> CACHE MISS! Buscando no DB...
+[READ] Key 103 -> CACHE MISS! Buscando no DB...
+[WRITE] Key 783 -> Gravando no DB e no CACHE simultaneamente (Novo: 3651)
+[WRITE] Key 476 -> Gravando no DB e no CACHE simultaneamente (Novo: 1018)
+[READ] Key  75 -> CACHE MISS! Buscando no DB...
+
+Entendimento:------------------------------------------
+Eu fiz o teste com a nova versão do programa e notei que a grande mudança aparece na hora de salvar os dados. O sistema agora salva a nova informação no arquivo principal e também na memória rápida ao mesmo tempo. Nas leituras o comportamento continuou parecido porque as buscas muito aleatórias quase sempre falhavam na memória rápida e precisavam ir direto no banco de dados. Eu também apertei o atalho do teclado duas vezes e vi que ele conseguiu esvaziar a memória temporária sem problemas e o programa continuou rodando normalmente.
++--------------------------------------------------+
+
+4)
+Eu comparei o tempo de processamento entre os dois programas que fiz. Percebi que no primeiro modelo o sistema apaga a informação da memória rápida quando salva um dado novo no arquivo principal. Isso faz com que a próxima leitura desse mesmo dado demore mais porque o programa vai precisar buscar tudo na base principal de novo.
+
+Já no segundo modelo o programa salva o dado novo nos dois lugares ao mesmo tempo. Isso exige um esforço mínimo a mais na hora de gravar mas deixa a próxima leitura muito mais rápida já que a informação nova já vai estar pronta na memória temporária. Como o nosso teste tem buscas muito aleatórias a diferença de velocidade no final das contas acaba não sendo tão grande na prática mas em um sistema real o segundo modelo pouparia muito tempo nas leituras repetidas.
+
++--------------------------------------------------+
