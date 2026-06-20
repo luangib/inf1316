@@ -71,6 +71,54 @@ int desenfileirar(int *fila, int *frente, int *tras) {
     return fila[(*frente)++];
 }
 
+// --- FASE 5: ALGORITMOS DE SUBSTITUICAO ---
+
+// Substituicao Global: Procura o quadro mais antigo na RAM inteira
+int global_substitute() {
+    int oldest_frame = 0;
+    int min_when = 9999999; // Começa com um valor bem alto
+    
+    for (int f = 0; f < NUM_FRAMES; f++) {
+        if (RAM_free[f] == 0) { // Se o quadro está ocupado
+            int proc_v = RAM[f] / 100; // Descobre o dono
+            int pag_v = RAM[f] % 100;  // Descobre a pagina
+            
+            // Verifica se o tempo de acesso dessa pagina eh o menor ate agora
+            if (tabela[proc_v].TP[pag_v].when < min_when) {
+                min_when = tabela[proc_v].TP[pag_v].when;
+                oldest_frame = f;
+            }
+        }
+    }
+    return oldest_frame;
+}
+
+// Substituicao Local: Procura o quadro mais antigo pertencente ao proprio processo
+int local_substitute(int proc_idx) {
+    int oldest_frame = -1;
+    int min_when = 9999999;
+    
+    for (int f = 0; f < NUM_FRAMES; f++) {
+        // So olha para os quadros se o dono for igual ao proc_idx
+        if (RAM_free[f] == 0 && (RAM[f] / 100) == proc_idx) {
+            int pag_v = RAM[f] % 100;
+            
+            if (tabela[proc_idx].TP[pag_v].when < min_when) {
+                min_when = tabela[proc_idx].TP[pag_v].when;
+                oldest_frame = f;
+            }
+        }
+    }
+    
+    // Tratamento de Excecao: E se a RAM esta cheia, mas ESSE processo ainda 
+    // nao tem nenhuma pagina la para substituir? Faremos um fallback para a Global.
+    if (oldest_frame == -1) {
+        return global_substitute();
+    }
+    
+    return oldest_frame;
+}
+
 // Tratador de Interrupcoes
 void trata_interrupcao(int sig) {
     if (sig == SIGALRM) { 
@@ -136,12 +184,34 @@ void trata_interrupcao(int sig) {
                     tabela[idx].TP[pagina_solicitada].frame = frame_livre;
                     espera_necessaria = 1;
                 } else {
-                    // RAM CHEIA! Placeholder ate a Fase 5.
-                    // Finge que o algoritmo escolheu o quadro 0 e ele estava sujo.
-                    frame_livre = 0;
-                    tabela[idx].TP[pagina_solicitada].frame = frame_livre;
-                    espera_necessaria = 2; 
-                    tabela[idx].total_page_faults_duplos++;
+                    // --- FASE 5: RAM CHEIA! ALGORITMO DE SUBSTITUICAO ---
+                    
+                    // ESCOLHA AQUI O SEU ALGORITMO (comente um e descomente o outro para testar):
+                    int frame_vitima = global_substitute(); 
+                    // int frame_vitima = local_substitute(idx);
+                    
+                    // 1. Descobrimos quem eh a vitima que vai ser removida
+                    int proc_vitima = RAM[frame_vitima] / 100;
+                    int pag_vitima = RAM[frame_vitima] % 100;
+                    
+                    printf("[KERNEL] ALERTA DE DESPEJO! Processo %s vai roubar o quadro %d do processo %s (Pagina m%02d).\n", 
+                           tabela[idx].nome, frame_vitima, tabela[proc_vitima].nome, pag_vitima);
+                    
+                    // 2. Verificamos se o caderno antigo estava sujo (modifyBit == 1)
+                    if (tabela[proc_vitima].TP[pag_vitima].modifyBit == 1) {
+                        espera_necessaria = 2; // Precisa salvar no swap primeiro
+                        tabela[idx].total_page_faults_duplos++;
+                    } else {
+                        espera_necessaria = 1; // Pode descartar direto
+                    }
+                    
+                    // 3. Atualiza a Tabela de Paginas da vitima (A pagina nao esta mais na RAM)
+                    tabela[proc_vitima].TP[pag_vitima].valid = 0;
+                    tabela[proc_vitima].TP[pag_vitima].frame = -1;
+                    
+                    // 4. O novo processo toma posse do quadro da RAM
+                    RAM[frame_vitima] = (idx * 100) + pagina_solicitada;
+                    tabela[idx].TP[pagina_solicitada].frame = frame_vitima;
                 }
 
                 enfileirar_swap(idx, pagina_solicitada, espera_necessaria);
