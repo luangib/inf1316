@@ -9,9 +9,10 @@
 #define PRONTO 0
 #define BLOQUEADO 1
 
-// --- DEFINICOES PARA MEMORIA VIRTUAL ---
 #define NUM_FRAMES 32
 #define NUM_PAGES 16
+
+int modo_substituicao = 0;
 
 typedef struct {
     int valid;      
@@ -40,22 +41,19 @@ PCB tabela[NUM_APPS];
 int processo_atual = 0;
 int fd_leitura;
 
-// Arrays Globais de Memoria (RAM)
 int RAM[NUM_FRAMES];       
 int RAM_free[NUM_FRAMES];  
 
-// Filas de Dispositivo FIFO
 int fila_d1[NUM_APPS], frente_d1 = 0, tras_d1 = 0;
 int fila_d2[NUM_APPS], frente_d2 = 0, tras_d2 = 0;
 
-// NOVO: Fila de Swap (Sw_Queue)
 typedef struct {
-    int pid_idx;      // Qual processo
-    int mem_req;      // Qual pagina ele quer
-    int espera;       // Quantos IRQ3 ele precisa esperar (1 ou 2)
+    int pid_idx;      
+    int mem_req;      
+    int espera;       
 } SwapRequest;
 
-SwapRequest fila_swap[100]; // Array maior para permitir re-enfileiramento
+SwapRequest fila_swap[100];
 int frente_swap = 0, tras_swap = 0;
 
 void enfileirar_swap(int idx, int pagina, int espera) {
@@ -71,19 +69,15 @@ int desenfileirar(int *fila, int *frente, int *tras) {
     return fila[(*frente)++];
 }
 
-// --- FASE 5: ALGORITMOS DE SUBSTITUICAO ---
-
-// Substituicao Global: Procura o quadro mais antigo na RAM inteira
 int global_substitute() {
     int oldest_frame = 0;
-    int min_when = 9999999; // Começa com um valor bem alto
+    int min_when = 9999999;
     
     for (int f = 0; f < NUM_FRAMES; f++) {
-        if (RAM_free[f] == 0) { // Se o quadro está ocupado
-            int proc_v = RAM[f] / 100; // Descobre o dono
-            int pag_v = RAM[f] % 100;  // Descobre a pagina
+        if (RAM_free[f] == 0) {
+            int proc_v = RAM[f] / 100;
+            int pag_v = RAM[f] % 100;
             
-            // Verifica se o tempo de acesso dessa pagina eh o menor ate agora
             if (tabela[proc_v].TP[pag_v].when < min_when) {
                 min_when = tabela[proc_v].TP[pag_v].when;
                 oldest_frame = f;
@@ -93,13 +87,11 @@ int global_substitute() {
     return oldest_frame;
 }
 
-// Substituicao Local: Procura o quadro mais antigo pertencente ao proprio processo
 int local_substitute(int proc_idx) {
     int oldest_frame = -1;
     int min_when = 9999999;
     
     for (int f = 0; f < NUM_FRAMES; f++) {
-        // So olha para os quadros se o dono for igual ao proc_idx
         if (RAM_free[f] == 0 && (RAM[f] / 100) == proc_idx) {
             int pag_v = RAM[f] % 100;
             
@@ -110,8 +102,6 @@ int local_substitute(int proc_idx) {
         }
     }
     
-    // Tratamento de Excecao: E se a RAM esta cheia, mas ESSE processo ainda 
-    // nao tem nenhuma pagina la para substituir? Faremos um fallback para a Global.
     if (oldest_frame == -1) {
         return global_substitute();
     }
@@ -119,7 +109,6 @@ int local_substitute(int proc_idx) {
     return oldest_frame;
 }
 
-// Tratador de Interrupcoes
 void trata_interrupcao(int sig) {
     if (sig == SIGALRM) { 
         printf("\n[KERNEL] => IRQ0 (Timer). Escalonamento Round-Robin.\n");
@@ -151,26 +140,21 @@ void trata_interrupcao(int sig) {
         int idx = processo_atual;
         sscanf(buffer, "%*s %s %c %s %d", tabela[idx].disp_bloqueio, &tabela[idx].op_bloqueio, tabela[idx].mem_atual, &tabela[idx].pc);
         
-        // NOVO: Fase 4 - Logica de Interceptacao de Memoria Virtual
         if (strcmp(tabela[idx].disp_bloqueio, "M") == 0) {
-            int pagina_solicitada = atoi(&tabela[idx].mem_atual[1]); // Extrai o numero (ex: "m05" -> 5)
+            int pagina_solicitada = atoi(&tabela[idx].mem_atual[1]);
             
             if (tabela[idx].TP[pagina_solicitada].valid == 1) {
-                // PAGE HIT: A pagina ja esta na RAM
                 printf("[KERNEL] PAGE HIT! Processo %s acessou direto a pagina m%02d na RAM.\n", tabela[idx].nome, pagina_solicitada);
-                tabela[idx].TP[pagina_solicitada].when = tabela[idx].pc; // Atualiza o relogio de acesso
+                tabela[idx].TP[pagina_solicitada].when = tabela[idx].pc; 
                 if (tabela[idx].op_bloqueio == 'W') {
-                    tabela[idx].TP[pagina_solicitada].modifyBit = 1; // Sujou a pagina
+                    tabela[idx].TP[pagina_solicitada].modifyBit = 1;
                 }
-                // Como foi direto na RAM, nao bloqueia, continua PRONTO
                 tabela[idx].estado = PRONTO; 
             } else {
-                // PAGE FAULT: Pagina nao esta na RAM
                 tabela[idx].total_page_faults++;
                 tabela[idx].estado = BLOQUEADO;
                 printf("[KERNEL] PAGE FAULT! Processo %s bloqueado aguardando pagina m%02d do Swap.\n", tabela[idx].nome, pagina_solicitada);
                 
-                // Procura um quadro livre na RAM
                 int frame_livre = -1;
                 for(int f = 0; f < NUM_FRAMES; f++) {
                     if (RAM_free[f] == 1) { frame_livre = f; break; }
@@ -178,38 +162,29 @@ void trata_interrupcao(int sig) {
 
                 int espera_necessaria;
                 if (frame_livre != -1) {
-                    // Achou espaco vazio. Preenche e avisa que precisa de 1 IRQ3
                     RAM_free[frame_livre] = 0;
-                    RAM[frame_livre] = (idx * 100) + pagina_solicitada; // Assinatura simples de quem ocupa
+                    RAM[frame_livre] = (idx * 100) + pagina_solicitada;
                     tabela[idx].TP[pagina_solicitada].frame = frame_livre;
                     espera_necessaria = 1;
                 } else {
-                    // --- FASE 5: RAM CHEIA! ALGORITMO DE SUBSTITUICAO ---
+                    int frame_vitima = (modo_substituicao == 0) ? global_substitute() : local_substitute(idx);
                     
-                    // ESCOLHA AQUI O SEU ALGORITMO (comente um e descomente o outro para testar):
-                    int frame_vitima = global_substitute(); 
-                    // int frame_vitima = local_substitute(idx);
-                    
-                    // 1. Descobrimos quem eh a vitima que vai ser removida
                     int proc_vitima = RAM[frame_vitima] / 100;
                     int pag_vitima = RAM[frame_vitima] % 100;
                     
                     printf("[KERNEL] ALERTA DE DESPEJO! Processo %s vai roubar o quadro %d do processo %s (Pagina m%02d).\n", 
                            tabela[idx].nome, frame_vitima, tabela[proc_vitima].nome, pag_vitima);
                     
-                    // 2. Verificamos se o caderno antigo estava sujo (modifyBit == 1)
                     if (tabela[proc_vitima].TP[pag_vitima].modifyBit == 1) {
-                        espera_necessaria = 2; // Precisa salvar no swap primeiro
+                        espera_necessaria = 2;
                         tabela[idx].total_page_faults_duplos++;
                     } else {
-                        espera_necessaria = 1; // Pode descartar direto
+                        espera_necessaria = 1;
                     }
                     
-                    // 3. Atualiza a Tabela de Paginas da vitima (A pagina nao esta mais na RAM)
                     tabela[proc_vitima].TP[pag_vitima].valid = 0;
                     tabela[proc_vitima].TP[pag_vitima].frame = -1;
                     
-                    // 4. O novo processo toma posse do quadro da RAM
                     RAM[frame_vitima] = (idx * 100) + pagina_solicitada;
                     tabela[idx].TP[pagina_solicitada].frame = frame_vitima;
                 }
@@ -217,7 +192,6 @@ void trata_interrupcao(int sig) {
                 enfileirar_swap(idx, pagina_solicitada, espera_necessaria);
             }
         } 
-        // Logica Antiga para D1 e D2
         else {
             tabela[idx].estado = BLOQUEADO;
             printf("[KERNEL] Syscall: %s bloqueado por %s (%c). PC: %d\n", 
@@ -232,7 +206,6 @@ void trata_interrupcao(int sig) {
             }
         }
 
-        // Checa se precisa passar a CPU adiante
         int todos_bloqueados = 1;
         for(int i = 0; i < NUM_APPS; i++) {
             if(tabela[i].estado == PRONTO) { todos_bloqueados = 0; break; }
@@ -244,20 +217,17 @@ void trata_interrupcao(int sig) {
             do { processo_atual = (processo_atual + 1) % NUM_APPS; } while (tabela[processo_atual].estado == BLOQUEADO);
             kill(tabela[processo_atual].pid, SIGCONT);
         } else {
-            // Se foi um Page Hit, o processo_atual continua rodando
             kill(tabela[processo_atual].pid, SIGCONT);
         }
     }
-    // NOVO: Tratamento do Retorno do Disco de Swap (IRQ3)
     else if (sig == SIGIO) {
         if (frente_swap != tras_swap) {
             SwapRequest req = fila_swap[frente_swap];
-            frente_swap++; // Retira da frente
+            frente_swap++; 
 
-            req.espera--; // Decrementa a espera
+            req.espera--; 
 
             if (req.espera == 0) {
-                // Terminou! A pagina esta na RAM.
                 int idx = req.pid_idx;
                 tabela[idx].estado = PRONTO;
                 tabela[idx].TP[req.mem_req].valid = 1;
@@ -270,9 +240,8 @@ void trata_interrupcao(int sig) {
                 }
                 printf("\n[HARDWARE] =====> IRQ3: Swap Concluido! Processo %s tem a pagina m%02d na RAM <=====\n", tabela[idx].nome, req.mem_req);
             } else {
-                // Ainda precisa de mais um IRQ3 (salvando pagina suja anterior)
                 printf("\n[HARDWARE] =====> IRQ3: Salvamento parcial. %s precisa de mais um ciclo <=====\n", tabela[req.pid_idx].nome);
-                enfileirar_swap(req.pid_idx, req.mem_req, req.espera); // Volta pro final da fila
+                enfileirar_swap(req.pid_idx, req.mem_req, req.espera);
             }
         }
     }
@@ -314,6 +283,11 @@ void trata_interrupcao(int sig) {
 }
 
 int main() {
+    printf("Escolha o algoritmo de substituicao:\n1 - Global\n2 - Local\nOpcao: ");
+    scanf("%d", &modo_substituicao);
+    if (modo_substituicao == 2) modo_substituicao = 1;
+    else modo_substituicao = 0;
+
     FILE *f = fopen("kernel.pid", "w");
     fprintf(f, "%d", getpid());
     fclose(f);
@@ -327,7 +301,7 @@ int main() {
     signal(SIGUSR1, trata_interrupcao);
     signal(SIGUSR2, trata_interrupcao); 
     signal(SIGURG, trata_interrupcao);
-    signal(SIGIO, trata_interrupcao); // NOVO: Escutando o IRQ3
+    signal(SIGIO, trata_interrupcao);
     signal(SIGTSTP, trata_interrupcao); 
     signal(SIGCONT, trata_interrupcao);
 

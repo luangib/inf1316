@@ -19,31 +19,30 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL) ^ getpid());
 
-    // NOVO: Inicializa a pagina logica atual (0 a 15) fora do loop
+
     int mem = rand() % 16; 
 
     while(PC < MAX_ITERATIONS) {
         printf("Processo %s (PID: %d) executando... PC: %d, Mem: m%02d\n", nome, getpid(), PC, mem);
         
-        // NOVO: Fase 3 - 40% de chance de acessar uma nova pagina de memoria
+        
         if ((rand() % 100) < 40) {
-            mem = rand() % 16; // Sorteia o indice da nova pagina
-            char operacao = (rand() % 2 == 0) ? 'R' : 'W'; // Decide entre Leitura (R) ou Escrita (W)
+            mem = rand() % 16; 
+            char operacao = (rand() % 2 == 0) ? 'R' : 'W'; 
 
             char mensagem[50];
-            // Enviamos "M" como dispositivo para sinalizar ao Kernel que eh uma Syscall de Memoria
             sprintf(mensagem, "%s M %c m%02d %d", nome, operacao, mem, PC);
             
             write(write_fd, mensagem, strlen(mensagem) + 1);
             printf("\n>>> %s EXECUTOU SYSCALL DE MEMORIA: Op: %c | Mem: m%02d <<<\n", nome, operacao, mem);
             
-            kill(getppid(), SIGUSR1); // Avisa o Kernel
-            kill(getpid(), SIGSTOP);  // Bloqueia esperando a pagina ir para a RAM
+            kill(getppid(), SIGUSR1); 
+            kill(getpid(), SIGSTOP);  
         }
-        // Se nao acessou nova pagina, roda a logica antiga de D1/D2
+        
         else {
             int d = rand() % 100;
-            if ((d + 1) < 15) { // 14% de chance
+            if ((d + 1) < 15) { 
                 char dispositivo[3];
                 char operacao;
                 

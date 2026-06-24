@@ -26,7 +26,7 @@ int main() {
 
     while (1) {
         usleep(500000); 
-        kill(kernel_pid, SIGALRM); // IRQ0 - Timer (Probabilidade 1)
+        kill(kernel_pid, SIGALRM); 
         
         if ((rand() % 100) < 10) {
             printf("\n[CONTROLLER] *** Disparando IRQ1 (Dispositivo D1 terminou!) ***\n");
@@ -38,7 +38,7 @@ int main() {
             kill(kernel_pid, SIGURG);
         }
         
-        // NOVO: Fase 2 - Interrupcao IRQ3 do disco de Swap (50% de probabilidade)
+        
         if ((rand() % 100) < 50) {
             printf("\n[CONTROLLER] *** Disparando IRQ3 (Disco de Swap terminou!) ***\n");
             kill(kernel_pid, SIGIO); // Usando SIGIO para representar o IRQ3
