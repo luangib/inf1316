@@ -70,13 +70,42 @@ int desenfileirar(int *fila, int *frente, int *tras) {
 }
 
 int global_substitute() {
-    int oldest_frame = 0;
+    int oldest_frame = -1; // Começa com -1 para sabermos se ele achou algo
     int min_when = 9999999;
+    
+    // ====================================================================
+    // APENAS LIMPAS (M=0)
+    // ====================================================================
+    for (int f = 0; f < NUM_FRAMES; f++) {
+        if (RAM_free[f] == 0) {
+            int proc_v = RAM[f] / 100;
+            int pag_v = RAM[f] % 100;
+            
+            
+            if (tabela[proc_v].TP[pag_v].modifyBit == 0) {
+                if (tabela[proc_v].TP[pag_v].when < min_when) {
+                    min_when = tabela[proc_v].TP[pag_v].when;
+                    oldest_frame = f;
+                }
+            }
+        }
+    }
+    
+    
+    if (oldest_frame != -1) {
+        return oldest_frame;
+    }
+
+    // ====================================================================
+    // (Todas estão sujas). Procura a mais antiga geral.
+    // ====================================================================
+    min_when = 9999999; 
     
     for (int f = 0; f < NUM_FRAMES; f++) {
         if (RAM_free[f] == 0) {
             int proc_v = RAM[f] / 100;
             int pag_v = RAM[f] % 100;
+            
             
             if (tabela[proc_v].TP[pag_v].when < min_when) {
                 min_when = tabela[proc_v].TP[pag_v].when;
@@ -84,12 +113,41 @@ int global_substitute() {
             }
         }
     }
+    
     return oldest_frame;
 }
 
 int local_substitute(int proc_idx) {
     int oldest_frame = -1;
     int min_when = 9999999;
+    
+    // ====================================================================
+    // mais antiga LIMPA (M=0) DESTE PROCESSO
+    // ====================================================================
+    for (int f = 0; f < NUM_FRAMES; f++) {
+        
+        if (RAM_free[f] == 0 && (RAM[f] / 100) == proc_idx) {
+            int pag_v = RAM[f] % 100;
+            
+            
+            if (tabela[proc_idx].TP[pag_v].modifyBit == 0) {
+                if (tabela[proc_idx].TP[pag_v].when < min_when) {
+                    min_when = tabela[proc_idx].TP[pag_v].when;
+                    oldest_frame = f;
+                }
+            }
+        }
+    }
+    
+    
+    if (oldest_frame != -1) {
+        return oldest_frame;
+    }
+
+    // ====================================================================
+    // mais antiga SUJA (M=1) DESTE PROCESSO
+    // ====================================================================
+    min_when = 9999999; 
     
     for (int f = 0; f < NUM_FRAMES; f++) {
         if (RAM_free[f] == 0 && (RAM[f] / 100) == proc_idx) {
@@ -102,6 +160,9 @@ int local_substitute(int proc_idx) {
         }
     }
     
+    // ====================================================================
+    // VÁLVULA DE ESCAPE: O processo não tem NENHUMA página na RAM ainda.
+    // ====================================================================
     if (oldest_frame == -1) {
         return global_substitute();
     }
